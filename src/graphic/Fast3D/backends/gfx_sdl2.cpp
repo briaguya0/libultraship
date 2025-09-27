@@ -399,7 +399,7 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     SDL_SetNumberProperty(windowProps, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, mWindowWidth);
     SDL_SetNumberProperty(windowProps, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, mWindowHeight);
     SDL_SetNumberProperty(windowProps, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, flags);
-    wnd = SDL_CreateWindowWithProperties(windowProps);
+    mWnd = SDL_CreateWindowWithProperties(windowProps);
     SDL_DestroyProperties(windowProps);
 #ifdef _WIN32
     // Get Windows window handle and use it to subclass the window procedure.
@@ -427,7 +427,7 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         //     SDL_GL_GetDrawableSize() has been removed.
         //     SDL_GetWindowSizeInPixels() can be used in its place.
         //SDL_GL_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
-        SDL_GetWindowSizeInPixels(wnd, &mWindowWidth, &mWindowHeight);
+        SDL_GetWindowSizeInPixels(mWnd, &mWindowWidth, &mWindowHeight);
 
         if (startFullScreen) {
             SetFullscreenImpl(true, false);
@@ -454,7 +454,7 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         //     int 	index 	the index of the rendering driver to initialize, or -1 to initialize the first one supporting the requested flags.
         //     Uint32 	flags 	0, or one or more SDL_RendererFlags OR'd together.
         SDL_PropertiesID rendererProps = SDL_CreateProperties();
-        SDL_SetPointerProperty(rendererProps, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, wnd);
+        SDL_SetPointerProperty(rendererProps, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, mWnd);
         if (mVsyncEnabled) {
             SDL_SetNumberProperty(rendererProps, SDL_PROP_RENDERER_CREATE_PRESENT_VSYNC_NUMBER, 1);
         }
@@ -556,13 +556,13 @@ bool GfxWindowBackendSDL2::GetMouseState(uint32_t btn) {
 void GfxWindowBackendSDL2::SetMouseCapture(bool capture) {
     // https://wiki.libsdl.org/SDL3/README/migration#sdl_mouseh
     //     SDL_SetRelativeMouseMode() - replaced with SDL_SetWindowRelativeMouseMode()
-    SDL_SetWindowRelativeMouseMode(wnd, capture);
+    SDL_SetWindowRelativeMouseMode(mWnd, capture);
 }
 
 bool GfxWindowBackendSDL2::IsMouseCaptured() {
     // https://wiki.libsdl.org/SDL3/README/migration#sdl_mouseh
     //     SDL_GetRelativeMouseMode() - replaced with SDL_GetWindowRelativeMouseMode()
-    return SDL_GetWindowRelativeMouseMode(wnd);
+    return SDL_GetWindowRelativeMouseMode(mWnd);
 }
 
 void GfxWindowBackendSDL2::SetKeyboardCallbacks(bool (*onKeyDown)(int scancode), bool (*onKeyUp)(int scancode),
@@ -690,7 +690,7 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
             // https://wiki.libsdl.org/SDL3/SDL_DropEvent
             //     const char *data;   /**< The text for SDL_EVENT_DROP_TEXT and
             //     the file name for SDL_EVENT_DROP_FILE, NULL for other events */
-            Ship::Context::GetInstance()->GetFileDropMgr()->SetDroppedFile(event.drop.file);
+            Ship::Context::GetInstance()->GetFileDropMgr()->SetDroppedFile(event.drop.data);
             break;
         case SDL_EVENT_QUIT:
             Close();

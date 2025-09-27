@@ -52,14 +52,21 @@ void ConnectedPhysicalDeviceManager::RefreshConnectedSDLGamepads() {
     mConnectedSDLGamepads.clear();
     mConnectedSDLGamepadNames.clear();
 
-    for (int32_t i = 0; i < SDL_NumJoysticks(); i++) {
+    int i, numJoysticks;
+    SDL_JoystickID *joysticks = SDL_GetJoysticks(&numJoysticks);
+    if (!joysticks) {
+        return;
+    }
+
+    for (i = 0; i < numJoysticks; ++i) {
+        auto instanceId = joysticks[i];
+
         // skip if this SDL joystick isn't a Gamepad
-        if (!SDL_IsGamepad(i)) {
+        if (!SDL_IsGamepad(instanceId)) {
             continue;
         }
 
-        auto gamepad = SDL_OpenGamepad(i);
-        auto instanceId = SDL_GetJoystickID(SDL_GetGamepadJoystick(gamepad));
+        auto gamepad = SDL_OpenGamepad(instanceId);
         auto name = SDL_GetGamepadName(gamepad);
 
         mConnectedSDLGamepads[instanceId] = gamepad;
