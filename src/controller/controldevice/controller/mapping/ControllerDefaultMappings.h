@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "ControllerAxisDirectionMapping.h"
 
 #ifndef CONTROLLERBUTTONS_T

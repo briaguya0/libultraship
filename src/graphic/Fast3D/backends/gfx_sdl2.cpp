@@ -37,7 +37,7 @@
 #include <Windows.h>
 // https://wiki.libsdl.org/SDL3/README/migration#sdl_syswmh
 // This header has been removed.
-// #include <SDL_syswm.h>
+// #include <SDL3/SDL_syswm.h>
 #endif
 
 #define GFX_BACKEND_NAME "SDL"

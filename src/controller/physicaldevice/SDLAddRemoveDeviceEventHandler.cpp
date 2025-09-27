@@ -1,5 +1,5 @@
 #include "SDLAddRemoveDeviceEventHandler.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "Context.h"
 #include "controller/controldeck/ControlDeck.h"
 
