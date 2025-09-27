@@ -73,7 +73,7 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
     mRenderer = renderer;
     NS::AutoreleasePool* autorelease_pool = NS::AutoreleasePool::alloc()->init();
 
-    mLayer = (CA::MetalLayer*)SDL_RenderGetMetalLayer(renderer);
+    mLayer = (CA::MetalLayer*)SDL_GetRenderMetalLayer(renderer);
     mLayer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
 
     mDevice = mLayer->device();
@@ -94,7 +94,7 @@ static void SetupScreenFramebuffer(uint32_t width, uint32_t height);
 
 void GfxRenderingAPIMetal::NewFrame() {
     int width, height;
-    SDL_GetRendererOutputSize(mRenderer, &width, &height);
+    SDL_GetCurrentRenderOutputSize(mRenderer, &width, &height);
     SetupScreenFramebuffer(width, height);
 
     MTL::RenderPassDescriptor* current_render_pass = mFramebuffers[0].mRenderPassDescriptor;
@@ -662,7 +662,7 @@ void GfxRenderingAPIMetal::UpdateFramebufferParameters(int fb_id, uint32_t width
     // see `SetupScreenFramebuffer`.
     if (fb_id == 0) {
         int width, height;
-        SDL_GetRendererOutputSize(mRenderer, &width, &height);
+        SDL_GetCurrentRenderOutputSize(mRenderer, &width, &height);
         mLayer->setDrawableSize({ CGFloat(width), CGFloat(height) });
 
         return;

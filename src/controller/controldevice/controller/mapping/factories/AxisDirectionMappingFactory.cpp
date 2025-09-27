@@ -163,7 +163,7 @@ AxisDirectionMappingFactory::CreateAxisDirectionMappingFromSDLInput(uint8_t port
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              portIndex)) {
         for (int32_t button = SDL_GAMEPAD_BUTTON_SOUTH; button < SDL_GAMEPAD_BUTTON_COUNT; button++) {
-            if (SDL_GetGamepadButton(gamepad, static_cast<SDL_GameControllerButton>(button))) {
+            if (SDL_GetGamepadButton(gamepad, static_cast<SDL_GamepadButton>(button))) {
                 mapping = std::make_shared<SDLButtonToAxisDirectionMapping>(portIndex, stickIndex, direction, button);
                 break;
             }

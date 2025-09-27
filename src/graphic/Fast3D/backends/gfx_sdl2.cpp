@@ -379,7 +379,7 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     // Uint32 flags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_SHOWN;
     Uint32 flags = SDL_WINDOW_BORDERLESS;
 #else
-    // Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    // Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #endif
 
@@ -777,7 +777,7 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
     if (mVsyncEnabled != nextVsyncEnabled) {
         mVsyncEnabled = nextVsyncEnabled;
         SDL_GL_SetSwapInterval(mVsyncEnabled ? 1 : 0);
-        SDL_RenderSetVSync(mRenderer, mVsyncEnabled ? 1 : 0);
+        SDL_SetRenderVSync(mRenderer, mVsyncEnabled ? 1 : 0);
     }
 
     SyncFramerateWithTime();
@@ -813,7 +813,7 @@ bool GfxWindowBackendSDL2::IsRunning() {
 
 void GfxWindowBackendSDL2::Destroy() {
     // TODO: destroy _any_ resources used by SDL
-    SDL_GL_DeleteContext(mCtx);
+    SDL_GL_DestroyContext(mCtx);
     SDL_DestroyWindow(mWnd);
     SDL_DestroyRenderer(mRenderer);
     SDL_Quit();

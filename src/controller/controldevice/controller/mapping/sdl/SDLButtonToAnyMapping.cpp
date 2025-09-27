@@ -6,7 +6,7 @@
 namespace Ship {
 SDLButtonToAnyMapping::SDLButtonToAnyMapping(int32_t sdlControllerButton)
     : ControllerInputMapping(PhysicalDeviceType::SDLGamepad) {
-    mControllerButton = static_cast<SDL_GameControllerButton>(sdlControllerButton);
+    mControllerButton = static_cast<SDL_GamepadButton>(sdlControllerButton);
 }
 
 SDLButtonToAnyMapping::~SDLButtonToAnyMapping() {
@@ -22,7 +22,7 @@ std::string SDLButtonToAnyMapping::GetPhysicalInputName() {
             return "X";
         case SDL_GAMEPAD_BUTTON_NORTH:
             return "Y";
-        case SDL_CONTROLLER_BUTTON_BACK:
+        case SDL_GAMEPAD_BUTTON_BACK:
             return "View";
         case SDL_GAMEPAD_BUTTON_GUIDE:
             return "Xbox";

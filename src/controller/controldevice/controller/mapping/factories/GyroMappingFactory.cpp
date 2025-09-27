@@ -39,7 +39,7 @@ std::shared_ptr<ControllerGyroMapping> GyroMappingFactory::CreateGyroMappingFrom
     for (auto [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              portIndex)) {
-        if (!SDL_GameControllerHasSensor(gamepad, SDL_SENSOR_GYRO)) {
+        if (!SDL_GamepadHasSensor(gamepad, SDL_SENSOR_GYRO)) {
             continue;
         }
 

@@ -19,7 +19,7 @@ void SDLGyroMapping::Recalibrate() {
     for (const auto& [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              mPortIndex)) {
-        if (!SDL_GameControllerHasSensor(gamepad, SDL_SENSOR_GYRO)) {
+        if (!SDL_GamepadHasSensor(gamepad, SDL_SENSOR_GYRO)) {
             continue;
         }
 
@@ -50,7 +50,7 @@ void SDLGyroMapping::UpdatePad(float& x, float& y) {
     for (const auto& [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              mPortIndex)) {
-        if (!SDL_GameControllerHasSensor(gamepad, SDL_SENSOR_GYRO)) {
+        if (!SDL_GamepadHasSensor(gamepad, SDL_SENSOR_GYRO)) {
             continue;
         }
 
