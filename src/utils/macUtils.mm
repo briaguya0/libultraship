@@ -1,5 +1,4 @@
 // macUtils.mm
-#ifdef SDL_PLATFORM_APPLE
 #import "macUtils.h"
 #import <Cocoa/Cocoa.h>
 
@@ -30,4 +29,3 @@ bool isNativeMacOSFullscreenActive(SDL_Window *window) {
     }
     return false;
 }
-#endif
