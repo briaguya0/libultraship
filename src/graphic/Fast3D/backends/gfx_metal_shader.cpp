@@ -5,7 +5,7 @@
 //  Created by David Chavez on 16.08.22.
 //
 
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
 
 #include <Context.h>
 #include <resource/factory/ShaderFactory.h>

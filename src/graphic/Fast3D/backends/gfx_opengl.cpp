@@ -268,7 +268,7 @@ std::string GfxRenderingAPIOGL::BuildFsShader(const CCFeatures& cc_features) {
         { "SHADER_NOISE", SHADER_NOISE },
         { "o_three_point_filtering", mCurrentFilterMode == FILTER_THREE_POINT },
         { "append_formula", (InvokeFunc)append_formula },
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
         { "GLSL_VERSION", "#version 410 core" },
         { "attr", "in" },
         { "opengles", false },
@@ -331,7 +331,7 @@ static std::string BuildVsShader(const CCFeatures& cc_features) {
                                      { "o_alpha", cc_features.opt_alpha },
                                      { "o_inputs", cc_features.numInputs },
                                      { "update_floats", (InvokeFunc)UpdateFloats },
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
                                      { "GLSL_VERSION", "#version 410 core" },
                                      { "attr", "in" },
                                      { "out", "out" },
@@ -659,7 +659,7 @@ void GfxRenderingAPIOGL::Init() {
     glGenBuffers(1, &mOpenglVbo);
     glBindBuffer(GL_ARRAY_BUFFER, mOpenglVbo);
 
-#if defined(SDL_PLATFORM_APPLE) || defined(USE_OPENGLES)
+#if defined(__APPLE__) || defined(USE_OPENGLES)
     glGenVertexArrays(1, &mOpenglVao);
     glBindVertexArray(mOpenglVao);
 #endif

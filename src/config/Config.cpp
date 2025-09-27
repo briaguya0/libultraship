@@ -8,7 +8,7 @@
 #include "utils/StringHelper.h"
 #include "Context.h"
 
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
 #include "graphic/Fast3D/backends/gfx_metal.h"
 #endif
 
@@ -297,7 +297,7 @@ WindowBackend Config::GetWindowBackend() {
 #ifdef ENABLE_DX11
     return WindowBackend::FAST3D_DXGI_DX11;
 #endif
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
     if (Metal_IsSupported()) {
         return WindowBackend::FAST3D_SDL_METAL;
     }

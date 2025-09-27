@@ -17,7 +17,7 @@
 #include <windows.h>
 #endif
 
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
 #include "utils/AppleFolderManager.h"
 #include <unistd.h>
 #include <pwd.h>
@@ -413,7 +413,7 @@ std::string Context::GetAppBundlePath() {
 #ifdef NON_PORTABLE
     return CMAKE_INSTALL_PREFIX;
 #else
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
     FolderManager folderManager;
     return folderManager.getMainBundlePath();
 #endif
@@ -468,7 +468,7 @@ std::string Context::GetAppDirectoryPath(std::string appName) {
     return std::string(home) + "/Documents";
 #endif
 
-#if defined(SDL_PLATFORM_APPLE)
+#if defined(__APPLE__)
     if (char* fpath = std::getenv("SHIP_HOME")) {
         if (fpath[0] == '~') {
             const char* home = getenv("HOME") ? getenv("HOME") : getpwuid(getuid())->pw_dir;

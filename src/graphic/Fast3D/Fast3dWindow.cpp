@@ -28,7 +28,7 @@ Fast3dWindow::Fast3dWindow(std::shared_ptr<Ship::Gui> gui) : Ship::Window(gui) {
 #ifdef _WIN32
     AddAvailableWindowBackend(Ship::WindowBackend::FAST3D_DXGI_DX11);
 #endif
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
     if (Metal_IsSupported()) {
         AddAvailableWindowBackend(Ship::WindowBackend::FAST3D_SDL_METAL);
     }
@@ -131,7 +131,7 @@ void Fast3dWindow::InitWindowManager() {
             mWindowManagerApi = new GfxWindowBackendSDL2();
             break;
 #endif
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
         case Ship::WindowBackend::FAST3D_SDL_METAL:
             mRenderingApi = new GfxRenderingAPIMetal();
             mWindowManagerApi = new GfxWindowBackendSDL2();
@@ -275,7 +275,7 @@ uint32_t Fast3dWindow::GetCurrentRefreshRate() {
 }
 
 bool Fast3dWindow::SupportsWindowedFullscreen() {
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
     return false;
 #endif
 

@@ -5,7 +5,7 @@
 //  Created by David Chavez on 16.08.22.
 //
 #pragma once
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
 
 #include "gfx_rendering_api.h"
 #include "../interpreter.h"

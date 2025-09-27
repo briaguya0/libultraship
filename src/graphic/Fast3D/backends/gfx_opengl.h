@@ -13,7 +13,7 @@
 #include <SDL3/SDL.h>
 #define GL_GLEXT_PROTOTYPES 1
 #include <SDL3/SDL_opengl.h>
-#elif SDL_PLATFORM_APPLE
+#elif __APPLE__
 #include <SDL3/SDL.h>
 #include <GL/glew.h>
 #elif USE_OPENGLES
@@ -113,7 +113,7 @@ class GfxRenderingAPIOGL final : public GfxRenderingAPI {
     ShaderProgram* mCurrentShaderProgram;
 
     GLuint mOpenglVbo = 0;
-#if defined(SDL_PLATFORM_APPLE) || defined(USE_OPENGLES)
+#if defined(__APPLE__) || defined(USE_OPENGLES)
     GLuint mOpenglVao;
 #endif
 

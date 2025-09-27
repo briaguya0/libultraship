@@ -7,7 +7,7 @@
 #include "Context.h"
 #include "controller/controldeck/ControlDeck.h"
 
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
 #include "utils/AppleFolderManager.h"
 #endif
 
