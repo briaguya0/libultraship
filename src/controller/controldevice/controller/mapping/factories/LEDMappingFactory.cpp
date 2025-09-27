@@ -37,7 +37,10 @@ std::shared_ptr<ControllerLEDMapping> LEDMappingFactory::CreateLEDMappingFromSDL
     for (auto [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              portIndex)) {
-        if (!SDL_GameControllerHasLED(gamepad)) {
+        // todo: SDL_GameControllerHasLED() - replaced with SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN
+        // if (!SDL_GameControllerHasLED(gamepad)) {
+        auto props = SDL_GetGamepadProperties(gamepad);
+        if (false) {
             continue;
         }
 

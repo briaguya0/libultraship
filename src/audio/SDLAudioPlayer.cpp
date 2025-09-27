@@ -45,7 +45,7 @@ int SDLAudioPlayer::Buffered() {
     //     Get the number of bytes currently queued.
     // i'm trying SDL_GetAudioStreamQueued for now
 
-    return SDL_GetQueuedAudioSize(mDevice) / (sizeof(int16_t) * mNumChannels);
+    return SDL_GetAudioStreamQueued(mAudioStream) / (sizeof(int16_t) * mNumChannels);
 }
 
 void SDLAudioPlayer::Play(const uint8_t* buf, size_t len) {

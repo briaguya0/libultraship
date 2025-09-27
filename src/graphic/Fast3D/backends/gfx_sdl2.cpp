@@ -224,7 +224,7 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
         // OTRTODO: Get mode from config.
         auto mode = SDL_GetDesktopDisplayMode(display_in_use);
         if (mode != nullptr) {
-            SDL_SetWindowFullscreenMode(wnd, mode);
+            SDL_SetWindowFullscreenMode(mWnd, mode);
         } else {
             SPDLOG_ERROR(SDL_GetError());
         }
@@ -247,7 +247,7 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
     https://wiki.libsdl.org/SDL3/SDL_SetWindowFullscreenMode
     https://wiki.libsdl.org/SDL3/SDL_GetFullscreenDisplayModes
     */
-    if (SDL_SetWindowFullscreen(wnd, on)) {
+    if (SDL_SetWindowFullscreen(mWnd, on)) {
         mFullScreen = on;
     } else {
         SPDLOG_ERROR("Failed to switch from or to fullscreen mode.");
