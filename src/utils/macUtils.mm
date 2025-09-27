@@ -1,7 +1,6 @@
 // macUtils.mm
 #ifdef SDL_PLATFORM_APPLE
 #import "macUtils.h"
-#import <SDL3/SDL_syswm.h>
 #import <Cocoa/Cocoa.h>
 
 //Just a simple function to toggle the native macOS fullscreen.
