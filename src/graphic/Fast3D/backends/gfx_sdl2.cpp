@@ -353,7 +353,7 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
     }
 
-#if defined(__APPLE__)
+#if defined(SDL_PLATFORM_APPLE)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
@@ -578,7 +578,7 @@ void GfxWindowBackendSDL2::SetMouseCallbacks(bool (*onMouseButtonDown)(int btn),
 }
 
 void GfxWindowBackendSDL2::GetDimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
     SDL_GetWindowSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
 #else
     // https://wiki.libsdl.org/SDL3/README/migration#sdl_videoh
@@ -673,7 +673,7 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
             // https://wiki.libsdl.org/SDL3/README/migration#sdl_videoh
             //     SDL_GL_GetDrawableSize() has been removed.
             //     SDL_GetWindowSizeInPixels() can be used in its place.
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
             SDL_GetWindowSize(mWnd, &mWindowWidth, &mWindowHeight);
 #else
             SDL_GetWindowSizeInPixels(mWnd, &mWindowWidth, &mWindowHeight);
@@ -709,7 +709,7 @@ void GfxWindowBackendSDL2::HandleEvents() {
     }
 
     // resync fullscreen state
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
     auto nextFullscreenState = isNativeMacOSFullscreenActive(mWnd);
     if (mFullScreen != nextFullscreenState) {
         mFullScreen = nextFullscreenState;
@@ -737,7 +737,7 @@ void GfxWindowBackendSDL2::SyncFramerateWithTime() const {
 #ifdef _WIN32
     // We want to exit a bit early, so we can busy-wait the rest to never miss the deadline
     left -= 15000UL;
-#elif defined(__APPLE__)
+#elif defined(SDL_PLATFORM_APPLE)
     // Use macOS scheduler interval on macOS
     left -= 10000UL;
 #endif

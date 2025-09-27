@@ -275,7 +275,7 @@ uint32_t Fast3dWindow::GetCurrentRefreshRate() {
 }
 
 bool Fast3dWindow::SupportsWindowedFullscreen() {
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
     return false;
 #endif
 
