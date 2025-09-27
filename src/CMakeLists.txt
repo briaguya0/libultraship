@@ -101,6 +101,13 @@ else()
     list(REMOVE_ITEM Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/utils/AppleFolderManager.h)
 endif()
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND Source_Files__Utils ${CMAKE_CURRENT_SOURCE_DIR}/utils/macUtils.mm)
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/utils/macUtils.mm PROPERTIES COMPILE_FLAGS -fno-objc-arc)
+else()
+    list(REMOVE_ITEM Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/utils/macUtils.h)
+endif()
+
 source_group("utils" FILES ${Source_Files__Utils})
 target_sources(libultraship PRIVATE ${Source_Files__Utils})
 
@@ -134,21 +141,20 @@ target_sources(libultraship PRIVATE ${Source_Files__Resource} ${Source_Files__Re
 
 #=================== Graphic ===================
 
-file(GLOB Source_Files__Graphic RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "graphic/Fast3D/*.h" "graphic/Fast3D/*.cpp" "graphic/Fast3D/*.c")
-file(GLOB Source_Files__Graphic_Debug RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "graphic/Fast3D/debug/*.h" "graphic/Fast3D/debug/*.cpp" "graphic/Fast3D/debug/*.c")
+file(GLOB Source_Files__Graphic RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "graphic/Fast3D/*.h" "graphic/Fast3D/*.cpp" "graphic/Fast3D/*.c" "graphic/Fast3D/backends/*.cpp" "graphic/Fast3D/debug/*.h" "graphic/Fast3D/debug/*.cpp" "graphic/Fast3D/debug/*.c")
 
 if (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/gfx_dxgi*")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/gfx_direct3d*")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/dxsdk/*")
+    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_dxgi*")
+    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_direct3d*")
+    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/dxsdk/*")
 endif()
 
 if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/gfx_metal*")
+    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_metal*")
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/gfx_opengl*")
+    list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_opengl*")
 endif()
 
 source_group("graphic" FILES ${Source_Files__Graphic})
@@ -164,7 +170,7 @@ target_include_directories(libultraship
 )
 
 #=================== Linking ===================
-if(NOT EXCLUDE_MPQ_SUPPORT)
+if(INCLUDE_MPQ_SUPPORT)
     if (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         target_link_libraries(libultraship PUBLIC "$<LINK_LIBRARY:WHOLE_ARCHIVE,storm>")
     else()
@@ -198,6 +204,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
     target_link_libraries(libultraship PRIVATE Threads::Threads)
+    find_library(COCOA Cocoa)
+    target_link_libraries(libultraship PRIVATE ${COCOA})
+
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -217,6 +226,8 @@ if (USE_OPENGLES)
         target_link_libraries(libultraship PRIVATE GLESv2)
     endif()
 endif()
+
+target_link_libraries(libultraship PUBLIC prism)
 
 #=================== Compile Options & Defs ===================
 

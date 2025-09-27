@@ -4,30 +4,36 @@
 #include "window/gui/IconsFontAwesome4.h"
 #include "public/bridge/consolevariablebridge.h"
 #include "Context.h"
+#include "controller/controldeck/ControlDeck.h"
 
 #define MAX_SDL_RANGE (float)INT16_MAX
 
 namespace Ship {
-SDLButtonToAxisDirectionMapping::SDLButtonToAxisDirectionMapping(ShipDeviceIndex shipDeviceIndex, uint8_t portIndex,
-                                                                 StickIndex stickIndex, Direction direction,
-                                                                 int32_t sdlControllerButton)
-    : ControllerInputMapping(shipDeviceIndex),
-      ControllerAxisDirectionMapping(shipDeviceIndex, portIndex, stickIndex, direction),
-      SDLButtonToAnyMapping(shipDeviceIndex, sdlControllerButton) {
+SDLButtonToAxisDirectionMapping::SDLButtonToAxisDirectionMapping(uint8_t portIndex, StickIndex stickIndex,
+                                                                 Direction direction, int32_t sdlControllerButton)
+    : ControllerInputMapping(PhysicalDeviceType::SDLGamepad),
+      ControllerAxisDirectionMapping(PhysicalDeviceType::SDLGamepad, portIndex, stickIndex, direction),
+      SDLButtonToAnyMapping(sdlControllerButton) {
 }
 
 float SDLButtonToAxisDirectionMapping::GetNormalizedAxisDirectionValue() {
-    if (ControllerLoaded() && !Context::GetInstance()->GetControlDeck()->GamepadGameInputBlocked() &&
-        SDL_GetGamepadButton(mController, mControllerButton)) {
-        return MAX_AXIS_RANGE;
+    if (Context::GetInstance()->GetControlDeck()->GamepadGameInputBlocked()) {
+        return 0.0f;
+    }
+
+    for (const auto& [instanceId, gamepad] :
+         Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
+             mPortIndex)) {
+        if (SDL_GetGamepadButton(gamepad, mControllerButton)) {
+            return MAX_AXIS_RANGE;
+        }
     }
 
     return 0.0f;
 }
 
 std::string SDLButtonToAxisDirectionMapping::GetAxisDirectionMappingId() {
-    return StringHelper::Sprintf("P%d-S%d-D%d-LUSI%d-SDLB%d", mPortIndex, mStickIndex, mDirection,
-                                 ControllerInputMapping::mShipDeviceIndex, mControllerButton);
+    return StringHelper::Sprintf("P%d-S%d-D%d-SDLB%d", mPortIndex, mStickIndex, mDirection, mControllerButton);
 }
 
 void SDLButtonToAxisDirectionMapping::SaveToConfig() {
@@ -36,8 +42,6 @@ void SDLButtonToAxisDirectionMapping::SaveToConfig() {
                   "SDLButtonToAxisDirectionMapping");
     CVarSetInteger(StringHelper::Sprintf("%s.Stick", mappingCvarKey.c_str()).c_str(), mStickIndex);
     CVarSetInteger(StringHelper::Sprintf("%s.Direction", mappingCvarKey.c_str()).c_str(), mDirection);
-    CVarSetInteger(StringHelper::Sprintf("%s.ShipDeviceIndex", mappingCvarKey.c_str()).c_str(),
-                   ControllerInputMapping::mShipDeviceIndex);
     CVarSetInteger(StringHelper::Sprintf("%s.SDLControllerButton", mappingCvarKey.c_str()).c_str(), mControllerButton);
     CVarSave();
 }
@@ -47,12 +51,19 @@ void SDLButtonToAxisDirectionMapping::EraseFromConfig() {
     CVarClear(StringHelper::Sprintf("%s.Stick", mappingCvarKey.c_str()).c_str());
     CVarClear(StringHelper::Sprintf("%s.Direction", mappingCvarKey.c_str()).c_str());
     CVarClear(StringHelper::Sprintf("%s.AxisDirectionMappingClass", mappingCvarKey.c_str()).c_str());
-    CVarClear(StringHelper::Sprintf("%s.ShipDeviceIndex", mappingCvarKey.c_str()).c_str());
     CVarClear(StringHelper::Sprintf("%s.SDLControllerButton", mappingCvarKey.c_str()).c_str());
     CVarSave();
 }
 
 int8_t SDLButtonToAxisDirectionMapping::GetMappingType() {
     return MAPPING_TYPE_GAMEPAD;
+}
+
+std::string SDLButtonToAxisDirectionMapping::GetPhysicalDeviceName() {
+    return SDLButtonToAnyMapping::GetPhysicalDeviceName();
+}
+
+std::string SDLButtonToAxisDirectionMapping::GetPhysicalInputName() {
+    return SDLButtonToAnyMapping::GetPhysicalInputName();
 }
 } // namespace Ship

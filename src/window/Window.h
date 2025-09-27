@@ -30,7 +30,8 @@ class Window {
   public:
     Window();
     Window(std::vector<std::shared_ptr<GuiWindow>> guiWindows);
-    ~Window();
+    Window(std::shared_ptr<Gui> gui);
+    virtual ~Window();
 
     virtual void Init() = 0;
     virtual void Close() = 0;
@@ -41,6 +42,7 @@ class Window {
     virtual void SetCursorVisibility(bool visible) = 0;
     virtual uint32_t GetWidth() = 0;
     virtual uint32_t GetHeight() = 0;
+    virtual float GetAspectRatio() = 0;
     virtual int32_t GetPosX() = 0;
     virtual int32_t GetPosY() = 0;
     virtual void SetMousePos(Coords pos) = 0;
@@ -59,6 +61,7 @@ class Window {
     virtual bool IsFullscreen() = 0;
     virtual bool IsRunning() = 0;
     virtual const char* GetKeyName(int32_t scancode) = 0;
+    virtual uintptr_t GetGfxFrameBuffer() = 0;
 
     WindowBackend GetWindowBackend();
     std::shared_ptr<std::vector<WindowBackend>> GetAvailableWindowBackends();
@@ -78,7 +81,7 @@ class Window {
 
   private:
     std::shared_ptr<Gui> mGui;
-    int32_t mLastScancode;
+    int32_t mLastScancode = -1;
     WindowBackend mWindowBackend;
     std::shared_ptr<std::vector<WindowBackend>> mAvailableWindowBackends;
     // Hold a reference to Config because Window has a Save function called on Context destructor, where the singleton

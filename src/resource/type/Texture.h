@@ -3,6 +3,7 @@
 #include "resource/Resource.h"
 
 #define TEX_FLAG_LOAD_AS_RAW (1 << 0)
+#define TEX_FLAG_LOAD_AS_IMG (1 << 1)
 
 namespace Fast {
 enum class TextureType {
@@ -18,7 +19,7 @@ enum class TextureType {
     GrayscaleAlpha16bpp = 9,
 };
 
-class Texture : public Ship::Resource<uint8_t> {
+class Texture final : public Ship::Resource<uint8_t> {
   public:
     using Resource::Resource;
 

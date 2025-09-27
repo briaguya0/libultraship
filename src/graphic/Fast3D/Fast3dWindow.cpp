@@ -1,25 +1,29 @@
 #include "Fast3dWindow.h"
 
 #include "Context.h"
+#include "config/Config.h"
+#include "controller/controldeck/ControlDeck.h"
 #include "public/bridge/consolevariablebridge.h"
-#include "graphic/Fast3D/gfx_pc.h"
-#include "graphic/Fast3D/gfx_sdl.h"
-#include "graphic/Fast3D/gfx_dxgi.h"
-#include "graphic/Fast3D/gfx_opengl.h"
-#include "graphic/Fast3D/gfx_metal.h"
-#include "graphic/Fast3D/gfx_direct3d11.h"
-#include "graphic/Fast3D/gfx_direct3d12.h"
-#include "graphic/Fast3D/gfx_pc.h"
+#include "graphic/Fast3D/interpreter.h"
+#include "graphic/Fast3D/backends/gfx_sdl.h"
+#include "graphic/Fast3D/backends/gfx_dxgi.h"
+#include "graphic/Fast3D/backends/gfx_opengl.h"
+#include "graphic/Fast3D/backends/gfx_metal.h"
+#include "graphic/Fast3D/backends/gfx_direct3d_common.h"
+#include "graphic/Fast3D/backends/gfx_direct3d11.h"
+#include "backends/gfx_window_manager_api.h"
 
 #include <fstream>
 
 namespace Fast {
-Fast3dWindow::Fast3dWindow() : Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>>()) {
-}
 
-Fast3dWindow::Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>> guiWindows) : Ship::Window(guiWindows) {
+extern void GfxSetInstance(std::shared_ptr<Interpreter> gfx);
+
+Fast3dWindow::Fast3dWindow(std::shared_ptr<Ship::Gui> gui) : Ship::Window(gui) {
     mWindowManagerApi = nullptr;
     mRenderingApi = nullptr;
+    mInterpreter = std::make_shared<Interpreter>();
+    GfxSetInstance(mInterpreter);
 
 #ifdef _WIN32
     AddAvailableWindowBackend(Ship::WindowBackend::FAST3D_DXGI_DX11);
@@ -32,9 +36,18 @@ Fast3dWindow::Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>> guiWind
     AddAvailableWindowBackend(Ship::WindowBackend::FAST3D_SDL_OPENGL);
 }
 
+Fast3dWindow::Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>> guiWindows)
+    : Fast3dWindow(std::make_shared<Ship::Gui>(guiWindows)) {
+}
+
+Fast3dWindow::Fast3dWindow() : Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>>()) {
+}
+
 Fast3dWindow::~Fast3dWindow() {
     SPDLOG_DEBUG("destruct fast3dwindow");
-    gfx_destroy();
+    mInterpreter->Destroy();
+    delete mRenderingApi;
+    delete mWindowManagerApi;
 }
 
 void Fast3dWindow::Init() {
@@ -77,30 +90,29 @@ void Fast3dWindow::Init() {
     SetForceCursorVisibility(CVarGetInteger("gForceCursorVisibility", 0));
 
     InitWindowManager();
-
-    gfx_init(mWindowManagerApi, mRenderingApi, Ship::Context::GetInstance()->GetName().c_str(), isFullscreen, width,
-             height, posX, posY);
-    mWindowManagerApi->set_fullscreen_changed_callback(OnFullscreenChanged);
-    mWindowManagerApi->set_keyboard_callbacks(KeyDown, KeyUp, AllKeysUp);
-    mWindowManagerApi->set_mouse_callbacks(MouseButtonDown, MouseButtonUp);
+    mInterpreter->Init(mWindowManagerApi, mRenderingApi, Ship::Context::GetInstance()->GetName().c_str(), isFullscreen,
+                       width, height, posX, posY);
+    mWindowManagerApi->SetFullscreenChangedCallback(OnFullscreenChanged);
+    mWindowManagerApi->SetKeyboardCallbacks(KeyDown, KeyUp, AllKeysUp);
+    mWindowManagerApi->SetMouseCallbacks(MouseButtonDown, MouseButtonUp);
 
     SetTextureFilter((FilteringMode)CVarGetInteger(CVAR_TEXTURE_FILTER, FILTER_THREE_POINT));
 }
 
 void Fast3dWindow::SetTargetFps(int32_t fps) {
-    gfx_set_target_fps(fps);
+    mInterpreter->SetTargetFPS(fps);
 }
 
 void Fast3dWindow::SetMaximumFrameLatency(int32_t latency) {
-    gfx_set_maximum_frame_latency(latency);
+    mInterpreter->SetMaxFrameLatency(latency);
 }
 
 void Fast3dWindow::GetPixelDepthPrepare(float x, float y) {
-    gfx_get_pixel_depth_prepare(x, y);
+    mInterpreter->GetPixelDepthPrepare(x, y);
 }
 
 uint16_t Fast3dWindow::GetPixelDepth(float x, float y) {
-    return gfx_get_pixel_depth(x, y);
+    return mInterpreter->GetPixelDepth(x, y);
 }
 
 void Fast3dWindow::InitWindowManager() {
@@ -109,20 +121,20 @@ void Fast3dWindow::InitWindowManager() {
     switch (GetWindowBackend()) {
 #ifdef ENABLE_DX11
         case Ship::WindowBackend::FAST3D_DXGI_DX11:
-            mRenderingApi = &gfx_direct3d11_api;
-            mWindowManagerApi = &gfx_dxgi_api;
+            mWindowManagerApi = new GfxWindowBackendDXGI();
+            mRenderingApi = new GfxRenderingAPIDX11(static_cast<GfxWindowBackendDXGI*>(mWindowManagerApi));
             break;
 #endif
 #ifdef ENABLE_OPENGL
         case Ship::WindowBackend::FAST3D_SDL_OPENGL:
-            mRenderingApi = &gfx_opengl_api;
-            mWindowManagerApi = &gfx_sdl;
+            mRenderingApi = new GfxRenderingAPIOGL();
+            mWindowManagerApi = new GfxWindowBackendSDL2();
             break;
 #endif
 #ifdef SDL_PLATFORM_APPLE
         case Ship::WindowBackend::FAST3D_SDL_METAL:
-            mRenderingApi = &gfx_metal_api;
-            mWindowManagerApi = &gfx_sdl;
+            mRenderingApi = new GfxRenderingAPIMetal();
+            mWindowManagerApi = new GfxWindowBackendSDL2();
             break;
 #endif
         default:
@@ -132,11 +144,11 @@ void Fast3dWindow::InitWindowManager() {
 }
 
 void Fast3dWindow::SetTextureFilter(FilteringMode filteringMode) {
-    gfx_get_current_rendering_api()->set_texture_filter(filteringMode);
+    mInterpreter->GetCurrentRenderingAPI()->SetTextureFilter(filteringMode);
 }
 
 void Fast3dWindow::EnableSRGBMode() {
-    gfx_get_current_rendering_api()->enable_srgb_mode();
+    mInterpreter->mRapi->SetSrgbMode();
 }
 
 void Fast3dWindow::SetRendererUCode(UcodeHandlers ucode) {
@@ -144,19 +156,19 @@ void Fast3dWindow::SetRendererUCode(UcodeHandlers ucode) {
 }
 
 void Fast3dWindow::Close() {
-    mWindowManagerApi->close();
+    mWindowManagerApi->Close();
 }
 
 void Fast3dWindow::StartFrame() {
-    gfx_start_frame();
+    mInterpreter->StartFrame();
 }
 
 void Fast3dWindow::EndFrame() {
-    gfx_end_frame();
+    mInterpreter->EndFrame();
 }
 
 bool Fast3dWindow::IsFrameReady() {
-    return mWindowManagerApi->is_frame_ready();
+    return mWindowManagerApi->IsFrameReady();
 }
 
 bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtxReplacements) {
@@ -171,96 +183,103 @@ bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordere
     // Setup of the backend frames and draw initial Window and GUI menus
     gui->StartDraw();
     // Setup game framebuffers to match available window space
-    gfx_start_frame();
+    mInterpreter->StartFrame();
     // Execute the games gfx commands
-    gfx_run(commands, mtxReplacements);
+    mInterpreter->Run(commands, mtxReplacements);
     // Renders the game frame buffer to the final window and finishes the GUI
     gui->EndDraw();
     // Finalize swap buffers
-    gfx_end_frame();
+    mInterpreter->EndFrame();
 
     return true;
 }
 
 void Fast3dWindow::HandleEvents() {
-    mWindowManagerApi->handle_events();
+    mWindowManagerApi->HandleEvents();
 }
 
 void Fast3dWindow::SetCursorVisibility(bool visible) {
-    mWindowManagerApi->set_cursor_visibility(visible);
+    mWindowManagerApi->SetCursorVisability(visible);
 }
 
 uint32_t Fast3dWindow::GetWidth() {
     uint32_t width, height;
     int32_t posX, posY;
-    mWindowManagerApi->get_dimensions(&width, &height, &posX, &posY);
+    mWindowManagerApi->GetDimensions(&width, &height, &posX, &posY);
     return width;
 }
 
 uint32_t Fast3dWindow::GetHeight() {
     uint32_t width, height;
     int32_t posX, posY;
-    mWindowManagerApi->get_dimensions(&width, &height, &posX, &posY);
+    mWindowManagerApi->GetDimensions(&width, &height, &posX, &posY);
     return height;
+}
+
+float Fast3dWindow::GetAspectRatio() {
+    return mInterpreter->mCurDimensions.aspect_ratio;
 }
 
 int32_t Fast3dWindow::GetPosX() {
     uint32_t width, height;
     int32_t posX, posY;
-    mWindowManagerApi->get_dimensions(&width, &height, &posX, &posY);
+    mWindowManagerApi->GetDimensions(&width, &height, &posX, &posY);
     return posX;
 }
 
 int32_t Fast3dWindow::GetPosY() {
     uint32_t width, height;
     int32_t posX, posY;
-    mWindowManagerApi->get_dimensions(&width, &height, &posX, &posY);
+    mWindowManagerApi->GetDimensions(&width, &height, &posX, &posY);
     return posY;
 }
 
 void Fast3dWindow::SetMousePos(Ship::Coords pos) {
-    mWindowManagerApi->set_mouse_pos(pos.x, pos.y);
+    mWindowManagerApi->SetMousePos(pos.x, pos.y);
 }
 
 Ship::Coords Fast3dWindow::GetMousePos() {
     int32_t x, y;
-    mWindowManagerApi->get_mouse_pos(&x, &y);
+    mWindowManagerApi->GetMousePos(&x, &y);
     return { x, y };
 }
 
 Ship::Coords Fast3dWindow::GetMouseDelta() {
     int32_t x, y;
-    mWindowManagerApi->get_mouse_delta(&x, &y);
+    mWindowManagerApi->GetMouseDelta(&x, &y);
     return { x, y };
 }
 
 Ship::CoordsF Fast3dWindow::GetMouseWheel() {
     float x, y;
-    mWindowManagerApi->get_mouse_wheel(&x, &y);
+    mWindowManagerApi->GetMouseWheel(&x, &y);
     return { x, y };
 }
 
 bool Fast3dWindow::GetMouseState(Ship::MouseBtn btn) {
-    return mWindowManagerApi->get_mouse_state(static_cast<uint32_t>(btn));
+    return mWindowManagerApi->GetMouseState(static_cast<uint32_t>(btn));
 }
 
 void Fast3dWindow::SetMouseCapture(bool capture) {
-    mWindowManagerApi->set_mouse_capture(capture);
+    mWindowManagerApi->SetMouseCapture(capture);
 }
 
 bool Fast3dWindow::IsMouseCaptured() {
-    return mWindowManagerApi->is_mouse_captured();
+    return mWindowManagerApi->IsMouseCaptured();
 }
 
 uint32_t Fast3dWindow::GetCurrentRefreshRate() {
     uint32_t refreshRate;
-    mWindowManagerApi->get_active_window_refresh_rate(&refreshRate);
+    mWindowManagerApi->GetActiveWindowRefreshRate(&refreshRate);
     return refreshRate;
 }
 
 bool Fast3dWindow::SupportsWindowedFullscreen() {
-    if (GetWindowBackend() == Ship::WindowBackend::FAST3D_SDL_OPENGL ||
-        GetWindowBackend() == Ship::WindowBackend::FAST3D_SDL_METAL) {
+#ifdef __APPLE__
+    return false;
+#endif
+
+    if (GetWindowBackend() == Ship::WindowBackend::FAST3D_SDL_OPENGL) {
         return true;
     }
 
@@ -268,32 +287,37 @@ bool Fast3dWindow::SupportsWindowedFullscreen() {
 }
 
 bool Fast3dWindow::CanDisableVerticalSync() {
-    return mWindowManagerApi->can_disable_vsync();
+    return mWindowManagerApi->CanDisableVsync();
 }
 
 void Fast3dWindow::SetResolutionMultiplier(float multiplier) {
-    gfx_current_dimensions.internal_mul = multiplier;
+    mInterpreter->SetResolutionMultiplier(multiplier);
 }
 
 void Fast3dWindow::SetMsaaLevel(uint32_t value) {
-    gfx_msaa_level = value;
+    mInterpreter->SetMsaaLevel(value);
 }
 
 void Fast3dWindow::SetFullscreen(bool isFullscreen) {
+    // Save current window position before fullscreening
     SaveWindowToConfig();
-    mWindowManagerApi->set_fullscreen(isFullscreen);
+    mWindowManagerApi->SetFullscreen(isFullscreen);
 }
 
 bool Fast3dWindow::IsFullscreen() {
-    return mWindowManagerApi->is_fullscreen();
+    return mWindowManagerApi->IsFullscreen();
 }
 
 bool Fast3dWindow::IsRunning() {
-    return mWindowManagerApi->is_running();
+    return mWindowManagerApi->IsRunning();
+}
+
+uintptr_t Fast3dWindow::GetGfxFrameBuffer() {
+    return mInterpreter->mGfxFrameBuffer;
 }
 
 const char* Fast3dWindow::GetKeyName(int32_t scancode) {
-    return mWindowManagerApi->get_key_name(scancode);
+    return mWindowManagerApi->GetKeyName(scancode);
 }
 
 bool Fast3dWindow::KeyUp(int32_t scancode) {
@@ -341,11 +365,18 @@ void Fast3dWindow::OnFullscreenChanged(bool isNowFullscreen) {
     std::shared_ptr<Window> wnd = Ship::Context::GetInstance()->GetWindow();
 
     if (isNowFullscreen) {
-        auto menuBar = wnd->GetGui()->GetMenuBar();
-        wnd->SetMouseCapture(!(menuBar && menuBar->IsVisible() || wnd->ShouldForceCursorVisibility() ||
-                               CVarGetInteger("gWindows.Menu", 0)));
+        auto menuVisible = wnd->GetGui()->GetMenuOrMenubarVisible();
+        wnd->SetMouseCapture(!(menuVisible || wnd->ShouldForceCursorVisibility()));
     } else {
         wnd->SetMouseCapture(false);
     }
+
+    // Re-save fullscreen enabled after
+    Ship::Context::GetInstance()->GetConfig()->SetBool("Window.Fullscreen.Enabled", isNowFullscreen);
 }
+
+std::weak_ptr<Interpreter> Fast3dWindow::GetInterpreterWeak() const {
+    return mInterpreter;
+}
+
 } // namespace Fast

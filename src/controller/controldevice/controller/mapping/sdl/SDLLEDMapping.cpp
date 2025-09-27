@@ -2,24 +2,15 @@
 
 #include "public/bridge/consolevariablebridge.h"
 #include "utils/StringHelper.h"
+#include "Context.h"
+#include "controller/controldeck/ControlDeck.h"
 
 namespace Ship {
-SDLLEDMapping::SDLLEDMapping(ShipDeviceIndex shipDeviceIndex, uint8_t portIndex, uint8_t colorSource,
-                             Color_RGB8 savedColor)
-    : ControllerLEDMapping(shipDeviceIndex, portIndex, colorSource, savedColor), SDLMapping(shipDeviceIndex) {
+SDLLEDMapping::SDLLEDMapping(uint8_t portIndex, uint8_t colorSource, Color_RGB8 savedColor)
+    : ControllerLEDMapping(PhysicalDeviceType::SDLGamepad, portIndex, colorSource, savedColor) {
 }
 
 void SDLLEDMapping::SetLEDColor(Color_RGB8 color) {
-    if (!ControllerLoaded()) {
-        return;
-    }
-
-    // todo: SDL_GameControllerHasLED() - replaced with SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN
-    // if (!SDL_GameControllerHasLED(mController)) {
-    if (true) {
-        return;
-    }
-
     if (mColorSource == LED_COLOR_SOURCE_OFF) {
         color = { 0, 0, 0 };
     }
@@ -28,18 +19,26 @@ void SDLLEDMapping::SetLEDColor(Color_RGB8 color) {
         color = mSavedColor;
     }
 
-    SDL_SetJoystickLED(SDL_GetGamepadJoystick(mController), color.r, color.g, color.b);
+    for (const auto& [instanceId, gamepad] :
+         Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
+             mPortIndex)) {
+        // todo: SDL_GameControllerHasLED() - replaced with SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN
+        // if (!SDL_GameControllerHasLED(gamepad)) {
+        if (true) {
+            continue;
+        }
+
+        SDL_SetJoystickLED(SDL_GetGamepadJoystick(gamepad), color.r, color.g, color.b);
+    }
 }
 
 std::string SDLLEDMapping::GetLEDMappingId() {
-    return StringHelper::Sprintf("P%d-SDLI%d", mPortIndex, ControllerLEDMapping::mShipDeviceIndex);
+    return StringHelper::Sprintf("P%d", mPortIndex);
 }
 
 void SDLLEDMapping::SaveToConfig() {
     const std::string mappingCvarKey = CVAR_PREFIX_CONTROLLERS ".LEDMappings." + GetLEDMappingId();
     CVarSetString(StringHelper::Sprintf("%s.LEDMappingClass", mappingCvarKey.c_str()).c_str(), "SDLLEDMapping");
-    CVarSetInteger(StringHelper::Sprintf("%s.ShipDeviceIndex", mappingCvarKey.c_str()).c_str(),
-                   ControllerLEDMapping::mShipDeviceIndex);
     CVarSetInteger(StringHelper::Sprintf("%s.ColorSource", mappingCvarKey.c_str()).c_str(), mColorSource);
     CVarSetColor24(StringHelper::Sprintf("%s.SavedColor", mappingCvarKey.c_str()).c_str(), mSavedColor);
     CVarSave();
@@ -49,7 +48,6 @@ void SDLLEDMapping::EraseFromConfig() {
     const std::string mappingCvarKey = CVAR_PREFIX_CONTROLLERS ".LEDMappings." + GetLEDMappingId();
 
     CVarClear(StringHelper::Sprintf("%s.LEDMappingClass", mappingCvarKey.c_str()).c_str());
-    CVarClear(StringHelper::Sprintf("%s.ShipDeviceIndex", mappingCvarKey.c_str()).c_str());
     CVarClear(StringHelper::Sprintf("%s.ColorSource", mappingCvarKey.c_str()).c_str());
     CVarClear(StringHelper::Sprintf("%s.SavedColor", mappingCvarKey.c_str()).c_str());
 
@@ -57,10 +55,6 @@ void SDLLEDMapping::EraseFromConfig() {
 }
 
 std::string SDLLEDMapping::GetPhysicalDeviceName() {
-    return GetSDLDeviceName();
-}
-
-bool SDLLEDMapping::PhysicalDeviceIsConnected() {
-    return ControllerLoaded();
+    return "SDL Gamepad";
 }
 } // namespace Ship

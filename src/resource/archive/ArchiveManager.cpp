@@ -4,10 +4,11 @@
 #include "spdlog/spdlog.h"
 
 #include "resource/archive/Archive.h"
-#ifndef EXCLUDE_MPQ_SUPPORT
+#ifdef INCLUDE_MPQ_SUPPORT
 #include "resource/archive/OtrArchive.h"
 #endif
 #include "resource/archive/O2rArchive.h"
+#include "resource/archive/FolderArchive.h"
 #include "utils/StringHelper.h"
 #include "utils/glob.h"
 #include "utils/StrHash64.h"
@@ -38,22 +39,21 @@ bool ArchiveManager::IsLoaded() {
     return !mArchives.empty();
 }
 
-std::shared_ptr<File> ArchiveManager::LoadFile(const std::string& filePath,
-                                               std::shared_ptr<ResourceInitData> initData) {
+std::shared_ptr<File> ArchiveManager::LoadFile(const std::string& filePath) {
     if (filePath == "") {
         return nullptr;
     }
 
-    return LoadFile(CRC64(filePath.c_str()), initData);
+    return LoadFile(CRC64(filePath.c_str()));
 }
 
-std::shared_ptr<File> ArchiveManager::LoadFile(uint64_t hash, std::shared_ptr<ResourceInitData> initData) {
+std::shared_ptr<File> ArchiveManager::LoadFile(uint64_t hash) {
     auto archive = mFileToArchive[hash];
     if (archive == nullptr) {
         return nullptr;
     }
 
-    return archive->LoadFile(hash, initData);
+    return archive->LoadFile(hash);
 }
 
 bool ArchiveManager::HasFile(const std::string& filePath) {
@@ -64,12 +64,16 @@ bool ArchiveManager::HasFile(uint64_t hash) {
     return mFileToArchive.count(hash) > 0;
 }
 
+std::shared_ptr<Archive> ArchiveManager::GetArchiveFromFile(const std::string& filePath) {
+    return mFileToArchive[CRC64(filePath.c_str())];
+}
+
 std::shared_ptr<std::vector<std::string>> ArchiveManager::ListFiles(const std::string& searchMask) {
     std::list<std::string> includes = {};
-    if (searchMask.size() > 0) {
+    if (!searchMask.empty()) {
         includes.push_back(searchMask);
     }
-    return ListFiles({ searchMask }, {});
+    return ListFiles(includes, {});
 }
 
 std::shared_ptr<std::vector<std::string>> ArchiveManager::ListFiles(const std::list<std::string>& includes,
@@ -105,6 +109,16 @@ std::shared_ptr<std::vector<std::string>> ArchiveManager::ListFiles(const std::l
     return list;
 }
 
+std::shared_ptr<std::vector<std::string>> ArchiveManager::ListDirectories(const std::string& searchMask) {
+    auto list = std::make_shared<std::vector<std::string>>();
+    for (const std::string& dir : mDirectories) {
+        if (glob_match(searchMask.c_str(), dir.c_str())) {
+            list->push_back(dir);
+        }
+    }
+    return list;
+}
+
 std::vector<uint32_t> ArchiveManager::GetGameVersions() {
     return mGameVersions;
 }
@@ -134,6 +148,19 @@ void ArchiveManager::ResetVirtualFileSystem() {
         archive->Load();
         AddArchive(archive);
     }
+}
+
+bool ArchiveManager::WriteFile(std::shared_ptr<Archive> archive, const std::string& filePath,
+                               const std::vector<uint8_t>& data) {
+    if (archive) {
+        if (archive->WriteFile(filePath, data)) {
+            auto hash = CRC64(filePath.c_str());
+            mHashes[hash] = filePath;
+            mFileToArchive[hash] = archive;
+            return true; // Successfully wrote file
+        }
+    }
+    return false; // Failed to write file
 }
 
 size_t ArchiveManager::RemoveArchive(const std::string& path) {
@@ -206,10 +233,12 @@ std::shared_ptr<Archive> ArchiveManager::AddArchive(const std::string& archivePa
 
     if (StringHelper::IEquals(extension, ".o2r") || StringHelper::IEquals(extension, ".zip")) {
         archive = dynamic_pointer_cast<Archive>(std::make_shared<O2rArchive>(archivePath));
-#ifndef EXCLUDE_MPQ_SUPPORT
+#ifdef INCLUDE_MPQ_SUPPORT
     } else if (StringHelper::IEquals(extension, ".otr") || StringHelper::IEquals(extension, ".mpq")) {
         archive = dynamic_pointer_cast<Archive>(std::make_shared<OtrArchive>(archivePath));
 #endif
+    } else if (StringHelper::IEquals(extension, "")) {
+        archive = dynamic_pointer_cast<Archive>(std::make_shared<FolderArchive>(archivePath));
     } else {
         // Not recognized file extension, trying with o2r
         SPDLOG_WARN("File extension \"{}\" not recognized, trying to create an o2r archive.", extension);
@@ -242,6 +271,12 @@ std::shared_ptr<Archive> ArchiveManager::AddArchive(std::shared_ptr<Archive> arc
     for (auto& [hash, filename] : *fileList.get()) {
         mHashes[hash] = filename;
         mFileToArchive[hash] = archive;
+
+        size_t lastSlash = filename.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            std::string dir = filename.substr(0, lastSlash);
+            mDirectories.insert(dir);
+        }
     }
     return archive;
 }

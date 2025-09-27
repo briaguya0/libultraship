@@ -3,7 +3,7 @@
 #include <SDL3/SDL.h>
 
 namespace Ship {
-class SDLAudioPlayer : public AudioPlayer {
+class SDLAudioPlayer final : public AudioPlayer {
   public:
     SDLAudioPlayer(AudioSettings settings) : AudioPlayer(settings) {
     }
@@ -16,6 +16,7 @@ class SDLAudioPlayer : public AudioPlayer {
     bool DoInit();
 
   private:
-  SDL_AudioStream* mAudioStream;
+    SDL_AudioStream* mAudioStream;
+    int32_t mNumChannels = 2;
 };
 } // namespace Ship

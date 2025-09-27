@@ -1,9 +1,6 @@
 #pragma once
 #ifdef __cplusplus
 
-#ifndef _LIBULTRASHIP_CLASSES_H
-#define _LIBULTRASHIP_CLASSES_H
-
 #include "resource/archive/ArchiveManager.h"
 #include "resource/archive/Archive.h"
 #include "resource/archive/OtrArchive.h"
@@ -37,6 +34,5 @@
 #include "audio/SDLAudioPlayer.h"
 #ifdef SDL_PLATFORM_APPLE
 #include "utils/AppleFolderManager.h"
-#endif
 #endif
 #endif

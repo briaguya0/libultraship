@@ -6,12 +6,13 @@
 #include "public/bridge/consolevariablebridge.h"
 #include "Context.h"
 #include "WheelHandler.h"
+#include "controller/controldeck/ControlDeck.h"
 
 namespace Ship {
 MouseWheelToAxisDirectionMapping::MouseWheelToAxisDirectionMapping(uint8_t portIndex, StickIndex stickIndex,
                                                                    Direction direction, WheelDirection wheelDirection)
-    : ControllerInputMapping(ShipDeviceIndex::Mouse), MouseWheelToAnyMapping(wheelDirection),
-      ControllerAxisDirectionMapping(ShipDeviceIndex::Mouse, portIndex, stickIndex, direction) {
+    : ControllerInputMapping(PhysicalDeviceType::Mouse), MouseWheelToAnyMapping(wheelDirection),
+      ControllerAxisDirectionMapping(PhysicalDeviceType::Mouse, portIndex, stickIndex, direction) {
 }
 
 float MouseWheelToAxisDirectionMapping::GetNormalizedAxisDirectionValue() {
@@ -52,5 +53,13 @@ void MouseWheelToAxisDirectionMapping::EraseFromConfig() {
 
 int8_t MouseWheelToAxisDirectionMapping::GetMappingType() {
     return MAPPING_TYPE_MOUSE;
+}
+
+std::string MouseWheelToAxisDirectionMapping::GetPhysicalDeviceName() {
+    return MouseWheelToAnyMapping::GetPhysicalDeviceName();
+}
+
+std::string MouseWheelToAxisDirectionMapping::GetPhysicalInputName() {
+    return MouseWheelToAnyMapping::GetPhysicalInputName();
 }
 } // namespace Ship

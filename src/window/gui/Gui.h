@@ -12,8 +12,7 @@
 #include <SDL3/SDL.h>
 #include "window/gui/ConsoleWindow.h"
 #include "window/gui/InputEditorWindow.h"
-#include "controller/deviceindex/ControllerDisconnectedWindow.h"
-#include "controller/deviceindex/ControllerReorderingWindow.h"
+#include "controller/physicaldevice/SDLAddRemoveDeviceEventHandler.h"
 #include "window/gui/IconsFontAwesome4.h"
 #include "window/gui/GameOverlay.h"
 #include "window/gui/StatsWindow.h"
@@ -23,7 +22,12 @@
 #include "resource/type/Texture.h"
 #include "window/gui/resource/GuiTexture.h"
 
+namespace Fast {
+class Interpreter;
+}
+
 namespace Ship {
+class Window;
 
 typedef struct {
     union {
@@ -66,7 +70,7 @@ class Gui {
   public:
     Gui();
     Gui(std::vector<std::shared_ptr<GuiWindow>> guiWindows);
-    ~Gui();
+    virtual ~Gui();
 
     void Init(GuiWindowInitData windowImpl);
     void StartDraw();
@@ -102,12 +106,13 @@ class Gui {
     bool GamepadNavigationEnabled();
     void BlockGamepadNavigation();
     void UnblockGamepadNavigation();
+    void ShutDownImGui(Ship::Window* window);
 
   protected:
     void StartFrame();
     void EndFrame();
     void DrawFloatingWindows();
-    void DrawMenu();
+    virtual void DrawMenu();
     void DrawGame();
     void CalculateGameViewport();
 
@@ -122,17 +127,18 @@ class Gui {
     int16_t GetIntegerScaleFactor();
     void CheckSaveCvars();
     void HandleMouseCapture();
+    ImVec2 mTemporaryWindowPos;
+    ImGuiIO* mImGuiIo;
+    std::map<std::string, std::shared_ptr<GuiWindow>> mGuiWindows;
+    std::weak_ptr<Fast::Interpreter> mInterpreter;
 
   private:
     GuiWindowInitData mImpl;
-    ImGuiIO* mImGuiIo;
     bool mNeedsConsoleVariableSave;
     std::shared_ptr<GameOverlay> mGameOverlay;
     std::shared_ptr<GuiMenuBar> mMenuBar;
     std::shared_ptr<GuiWindow> mMenu;
     std::unordered_map<std::string, GuiTextureMetadata> mGuiTextures;
-    std::map<std::string, std::shared_ptr<GuiWindow>> mGuiWindows;
-    ImVec2 mTemporaryWindowPos;
 };
 } // namespace Ship
 

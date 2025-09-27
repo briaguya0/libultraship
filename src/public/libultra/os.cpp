@@ -1,5 +1,5 @@
 #include "libultraship/libultraship.h"
-#include <SDL3/SDL.h>
+#include <SDL2/SDL.h>
 #include <ratio>
 
 // Establish a chrono duration for the N64 46.875MHz clock rate
@@ -9,11 +9,21 @@ typedef std::chrono::duration<long long, n64CycleRate> n64CycleRateDuration;
 
 extern "C" {
 uint8_t __osMaxControllers = MAXCONTROLLERS;
+uint64_t __osCurrentTime = 0;
 
 int32_t osContInit(OSMesgQueue* mq, uint8_t* controllerBits, OSContStatus* status) {
     *controllerBits = 0;
     status->status |= 1;
 
+    std::string controllerDb = Ship::Context::LocateFileAcrossAppDirs("gamecontrollerdb.txt");
+    int mappingsAdded = SDL_AddGamepadMappingsFromFile(controllerDb.c_str());
+    if (mappingsAdded >= 0) {
+        SPDLOG_INFO("Added SDL gamepad mappings from \"{}\" ({})", controllerDb, mappingsAdded);
+    } else {
+        SPDLOG_ERROR("Failed add SDL gamepad mappings from \"{}\" ({})", controllerDb, SDL_GetError());
+    }
+
+    SDL_SetHint(SDL_HINT_JOYSTICK_THREAD, "1");
     // https://wiki.libsdl.org/SDL3/SDL_Init
     //     SDL_Init() simply forwards to calling SDL_InitSubSystem().
     // https://wiki.libsdl.org/SDL3/SDL_InitSubSystem
@@ -21,14 +31,6 @@ int32_t osContInit(OSMesgQueue* mq, uint8_t* controllerBits, OSContStatus* statu
     if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
         SPDLOG_ERROR("Failed to initialize SDL gamepad subsystem ({})", SDL_GetError());
         exit(EXIT_FAILURE);
-    }
-
-    std::string controllerDb = Ship::Context::LocateFileAcrossAppDirs("gamecontrollerdb.txt");
-    int mappingsAdded = SDL_AddGamepadMappingsFromFile(controllerDb.c_str());
-    if (mappingsAdded >= 0) {
-        SPDLOG_INFO("Added SDL gamepad from \"{}\" ({})", controllerDb, mappingsAdded);
-    } else {
-        SPDLOG_ERROR("Failed add SDL gamepad mappings from \"{}\" ({})", controllerDb, SDL_GetError());
     }
 
     Ship::Context::GetInstance()->GetControlDeck()->Init(controllerBits);
@@ -46,11 +48,17 @@ void osContGetReadData(OSContPad* pad) {
     Ship::Context::GetInstance()->GetControlDeck()->WriteToPad(pad);
 }
 
+void osSetTime(OSTime time) {
+    __osCurrentTime =
+        std::chrono::duration_cast<n64CycleRateDuration>(std::chrono::steady_clock::now().time_since_epoch()).count() +
+        time;
+}
+
 // Returns the OS time matching the N64 46.875MHz cycle rate
-// LUSTODO: This should be adjusted to return the time since "boot"
 uint64_t osGetTime() {
     return std::chrono::duration_cast<n64CycleRateDuration>(std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+               .count() -
+           __osCurrentTime;
 }
 
 // Returns the CPU clock count matching the N64 46.875Mhz cycle rate

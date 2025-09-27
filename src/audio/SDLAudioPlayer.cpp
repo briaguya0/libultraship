@@ -17,7 +17,8 @@ bool SDLAudioPlayer::DoInit() {
         SPDLOG_ERROR("SDL init error: %s\n", SDL_GetError());
         return false;
     }
-    const SDL_AudioSpec spec = { SDL_AUDIO_S16, 2, this->GetSampleRate() };
+    mNumChannels = this->GetAudioChannels() == AudioChannelsSetting::audioSurround51 ? 6 : 2;
+    const SDL_AudioSpec spec = { SDL_AUDIO_S16, mNumChannels, this->GetSampleRate() };
     mAudioStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
     if (mAudioStream == nullptr) {
         SPDLOG_ERROR("SDL_OpenAudio error: {}", SDL_GetError());
@@ -44,8 +45,7 @@ int SDLAudioPlayer::Buffered() {
     //     Get the number of bytes currently queued.
     // i'm trying SDL_GetAudioStreamQueued for now
 
-    // 4 is sizeof(int16_t) * num_channels (2 for stereo)
-    return SDL_GetAudioStreamQueued(mAudioStream) / 4;
+    return SDL_GetQueuedAudioSize(mDevice) / (sizeof(int16_t) * mNumChannels);
 }
 
 void SDLAudioPlayer::Play(const uint8_t* buf, size_t len) {

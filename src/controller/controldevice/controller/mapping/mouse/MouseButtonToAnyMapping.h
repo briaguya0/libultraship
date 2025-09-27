@@ -7,11 +7,10 @@ namespace Ship {
 class MouseButtonToAnyMapping : virtual public ControllerInputMapping {
   public:
     MouseButtonToAnyMapping(MouseBtn button);
-    ~MouseButtonToAnyMapping();
-    std::string GetPhysicalInputName() override;
+    virtual ~MouseButtonToAnyMapping();
     bool ProcessMouseButtonEvent(bool isPressed, MouseBtn button);
     std::string GetPhysicalDeviceName() override;
-    bool PhysicalDeviceIsConnected() override;
+    std::string GetPhysicalInputName() override;
 
   protected:
     MouseBtn mButton;

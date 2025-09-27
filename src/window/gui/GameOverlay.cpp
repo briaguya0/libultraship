@@ -7,6 +7,7 @@
 #include "resource/archive/Archive.h"
 #include "resource/ResourceManager.h"
 #include "Context.h"
+#include "window/Window.h"
 #include "utils/StringHelper.h"
 
 namespace Ship {
@@ -31,8 +32,9 @@ void GameOverlay::LoadFont(const std::string& name, float fontSize, const Resour
         SPDLOG_ERROR("Failed to load font: {}", name);
         return;
     }
-
-    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, font->DataSize, fontSize);
+    ImFontConfig fontConf = {};
+    fontConf.FontDataOwnedByAtlas = false;
+    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, font->DataSize, fontSize, &fontConf);
 }
 
 void GameOverlay::LoadFont(const std::string& name, float fontSize, const std::string& path) {
@@ -49,8 +51,9 @@ void GameOverlay::LoadFont(const std::string& name, float fontSize, const std::s
         SPDLOG_ERROR("Failed to load font: {}", name);
         return;
     }
-
-    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, font->DataSize, fontSize);
+    ImFontConfig fontConf = {};
+    fontConf.FontDataOwnedByAtlas = false;
+    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, font->DataSize, fontSize, &fontConf);
 }
 
 void GameOverlay::TextDraw(float x, float y, bool shadow, ImVec4 color, const char* fmt, ...) {
@@ -213,7 +216,7 @@ void GameOverlay::Draw() {
                     TextDraw(30, textY, true, color, "%s %d", text, var->Integer);
                     break;
                 case ConsoleVariableType::String:
-                    TextDraw(30, textY, true, color, "%s %s", text, var->String.c_str());
+                    TextDraw(30, textY, true, color, "%s %s", text, var->String);
                     break;
                 case ConsoleVariableType::Color:
                     TextDraw(30, textY, true, color, "%s (%u, %u, %u, %u)", text, var->Color.r, var->Color.g,

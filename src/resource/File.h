@@ -5,9 +5,13 @@
 #include <vector>
 #include <memory>
 #include <stdint.h>
-#include <tinyxml2.h>
 #include "resource/ResourceType.h"
 #include "utils/binarytools/BinaryReader.h"
+
+namespace tinyxml2 {
+class XMLDocument;
+class XMLElement;
+} // namespace tinyxml2
 
 namespace Ship {
 class Archive;
@@ -27,7 +31,6 @@ struct ResourceInitData {
 };
 
 struct File {
-    std::shared_ptr<ResourceInitData> InitData;
     std::shared_ptr<std::vector<char>> Buffer;
     std::variant<std::shared_ptr<tinyxml2::XMLDocument>, std::shared_ptr<BinaryReader>> Reader;
     bool IsLoaded = false;

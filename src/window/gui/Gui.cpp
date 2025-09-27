@@ -11,20 +11,20 @@
 #include "Context.h"
 #include "public/bridge/consolevariablebridge.h"
 #include "resource/type/Texture.h"
-#include "graphic/Fast3D/gfx_pc.h"
 #include "resource/File.h"
 #include <stb_image.h>
 #include "window/gui/Fonts.h"
 #include "window/gui/resource/GuiTextureFactory.h"
-#include "graphic/Fast3D/gfx_rendering_api.h"
+#include "graphic/Fast3D/backends/gfx_rendering_api.h"
 
 #include "window/gui/GfxDebuggerWindow.h"
-
+#include "graphic/Fast3D/interpreter.h"
+#include "graphic/Fast3D/Fast3dWindow.h"
 #ifdef SDL_PLATFORM_APPLE
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_video.h>
 
-#include "graphic/Fast3D/gfx_metal.h"
+#include "graphic/Fast3D/backends/gfx_metal.h"
 #include <imgui_impl_metal.h>
 #include <imgui_impl_sdl3.h>
 #else
@@ -43,7 +43,7 @@
 #endif
 
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
-#include <graphic/Fast3D/gfx_direct3d11.h>
+#include <graphic/Fast3D/backends/gfx_direct3d11.h>
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 
@@ -72,14 +72,9 @@ Gui::Gui(std::vector<std::shared_ptr<GuiWindow>> guiWindows) : mNeedsConsoleVari
         AddGuiWindow(std::make_shared<InputEditorWindow>(CVAR_CONTROLLER_CONFIGURATION_WINDOW_OPEN, "Input Editor"));
     }
 
-    if (GetGuiWindow("Controller Disconnected") == nullptr) {
-        AddGuiWindow(std::make_shared<ControllerDisconnectedWindow>(CVAR_CONTROLLER_DISCONNECTED_WINDOW_OPEN,
-                                                                    "Controller Disconnected"));
-    }
-
-    if (GetGuiWindow("Controller Reordering") == nullptr) {
-        AddGuiWindow(std::make_shared<ControllerReorderingWindow>(CVAR_CONTROLLER_REORDERING_WINDOW_OPEN,
-                                                                  "Controller Reordering"));
+    if (GetGuiWindow("SDLAddRemoveDeviceEventHandler") == nullptr) {
+        AddGuiWindow(std::make_shared<SDLAddRemoveDeviceEventHandler>("gOpenWindows.SDLAddRemoveDeviceEventHandler",
+                                                                      "SDLAddRemoveDeviceEventHandler"));
     }
 
     if (GetGuiWindow("Console") == nullptr) {
@@ -98,6 +93,18 @@ Gui::Gui() : Gui(std::vector<std::shared_ptr<GuiWindow>>()) {
 
 Gui::~Gui() {
     SPDLOG_TRACE("destruct gui");
+    if (mImGuiIo != nullptr) {
+        //! @todo Refactor required to prevent memory leak. Also,
+        // the delete statements result in a use-after free when the program is closed.
+        if (mImGuiIo->IniFilename != nullptr) {
+            // delete[] mImGuiIo->IniFilename;
+        }
+        if (mImGuiIo->LogFilename != nullptr) {
+            // delete[] mImGuiIo->LogFilename;
+        }
+        // mImGuiIo->IniFilename = nullptr;
+        // mImGuiIo->LogFilename = nullptr;
+    }
 }
 
 void Gui::Init(GuiWindowInitData windowImpl) {
@@ -153,10 +160,10 @@ void Gui::Init(GuiWindowInitData windowImpl) {
         static_cast<uint32_t>(RESOURCE_TYPE_GUI_TEXTURE), 0);
 
     ImGuiWMInit();
+    mInterpreter = dynamic_pointer_cast<Fast::Fast3dWindow>(Context::GetInstance()->GetWindow())->GetInterpreterWeak();
     ImGuiBackendInit();
 
-    CVarClear(CVAR_NEW_FILE_DROPPED);
-    CVarClear(CVAR_DROPPED_FILE);
+    mInterpreter = dynamic_pointer_cast<Fast::Fast3dWindow>(Context::GetInstance()->GetWindow())->GetInterpreterWeak();
 }
 
 void Gui::ImGuiWMInit() {
@@ -183,6 +190,30 @@ void Gui::ImGuiWMInit() {
     }
 }
 
+void Gui::ShutDownImGui(Ship::Window* window) {
+    switch (window->GetWindowBackend()) {
+#ifdef ENABLE_OPENGL
+        case WindowBackend::FAST3D_SDL_OPENGL:
+            ImGui_ImplSDL2_Shutdown();
+            ImGui_ImplOpenGL3_Shutdown();
+            break;
+#endif
+#if SDL_PLATFORM_APPLE
+        case WindowBackend::FAST3D_SDL_METAL:
+            ImGui_ImplSDL2_Shutdown();
+            ImGui_ImplMetal_Shutdown();
+            break;
+#endif
+#if defined(ENABLE_DX11) || defined(ENABLE_DX12)
+        case WindowBackend::FAST3D_DXGI_DX11:
+            ImGui_ImplWin32_Shutdown();
+            ImGui_ImplDX11_Shutdown();
+            break;
+#endif
+    }
+    ImGui::DestroyContext();
+}
+
 void Gui::ImGuiBackendInit() {
     switch (Context::GetInstance()->GetWindow()->GetWindowBackend()) {
 #ifdef ENABLE_OPENGL
@@ -198,9 +229,13 @@ void Gui::ImGuiBackendInit() {
 #endif
 
 #ifdef SDL_PLATFORM_APPLE
-        case WindowBackend::FAST3D_SDL_METAL:
-            Metal_Init(mImpl.Metal.Renderer);
+        case WindowBackend::FAST3D_SDL_METAL: {
+            Fast::GfxRenderingAPIMetal* api =
+                (Fast::GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
+
+            api->MetalInit(mImpl.Metal.Renderer);
             break;
+        }
 #endif
 
 #ifdef ENABLE_DX11
@@ -223,13 +258,13 @@ void Gui::LoadTextureFromRawImage(const std::string& name, const std::string& pa
     auto guiTexture = std::static_pointer_cast<GuiTexture>(
         Context::GetInstance()->GetResourceManager()->LoadResource(path, false, initData));
 
-    GfxRenderingAPI* api = gfx_get_current_rendering_api();
+    Fast::GfxRenderingAPI* api = mInterpreter.lock()->GetCurrentRenderingAPI();
 
     // TODO: Nothing ever unloads the texture from Fast3D here.
-    guiTexture->Metadata.RendererTextureId = api->new_texture();
-    api->select_texture(0, guiTexture->Metadata.RendererTextureId);
-    api->set_sampler_parameters(0, false, 0, 0);
-    api->upload_texture(guiTexture->Data, guiTexture->Metadata.Width, guiTexture->Metadata.Height);
+    guiTexture->Metadata.RendererTextureId = api->NewTexture();
+    api->SelectTexture(0, guiTexture->Metadata.RendererTextureId);
+    api->SetSamplerParameters(0, false, 0, 0);
+    api->UploadTexture(guiTexture->Data, guiTexture->Metadata.Width, guiTexture->Metadata.Height);
 
     mGuiTextures[name] = guiTexture->Metadata;
 }
@@ -319,9 +354,13 @@ void Gui::ImGuiBackendNewFrame() {
 #endif
 
 #ifdef SDL_PLATFORM_APPLE
-        case WindowBackend::FAST3D_SDL_METAL:
-            Metal_NewFrame(mImpl.Metal.Renderer);
+        case WindowBackend::FAST3D_SDL_METAL: {
+            Fast::GfxRenderingAPIMetal* api =
+                (Fast::GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
+            api->NewFrame();
+            // Metal_NewFrame();
             break;
+        }
 #endif
         default:
             break;
@@ -359,8 +398,9 @@ void Gui::ApplyResolutionChanges() {
     const uint32_t minResolutionHeight = 240;
     const uint32_t maxResolutionWidth = 8096;  // the renderer's actual limit is 16384
     const uint32_t maxResolutionHeight = 4320; // on either axis. if you have the VRAM for it.
-    uint32_t newWidth = gfx_current_dimensions.width;
-    uint32_t newHeight = gfx_current_dimensions.height;
+    uint32_t newWidth;
+    uint32_t newHeight;
+    mInterpreter.lock()->GetCurDimensions(&newWidth, &newHeight);
 
     if (verticalResolutionToggle) { // Use fixed vertical resolution
         if (aspectRatioIsEnabled) {
@@ -371,12 +411,12 @@ void Gui::ApplyResolutionChanges() {
         newHeight = verticalPixelCount;
     } else { // Use the window's resolution
         if (aspectRatioIsEnabled) {
-            if (((float)gfx_current_game_window_viewport.height / gfx_current_game_window_viewport.width) <
-                (aspectRatioY / aspectRatioX)) {
+            if (((float)mInterpreter.lock()->mGameWindowViewport.height /
+                 mInterpreter.lock()->mGameWindowViewport.width) < (aspectRatioY / aspectRatioX)) {
                 // when pillarboxed
-                newWidth = uint32_t(float(gfx_current_dimensions.height / aspectRatioY) * aspectRatioX);
+                newWidth = uint32_t(float(mInterpreter.lock()->mCurDimensions.height / aspectRatioY) * aspectRatioX);
             } else { // when letterboxed
-                newHeight = uint32_t(float(gfx_current_dimensions.width / aspectRatioX) * aspectRatioY);
+                newHeight = uint32_t(float(mInterpreter.lock()->mCurDimensions.width / aspectRatioX) * aspectRatioY);
             }
         } // else, having both options turned off does nothing.
     }
@@ -394,8 +434,8 @@ void Gui::ApplyResolutionChanges() {
         newHeight = maxResolutionHeight;
     }
     // apply new dimensions
-    gfx_current_dimensions.width = newWidth;
-    gfx_current_dimensions.height = newHeight;
+    mInterpreter.lock()->mCurDimensions.width = newWidth;
+    mInterpreter.lock()->mCurDimensions.height = newHeight;
     // centring the image is done in Gui::StartFrame().
 }
 
@@ -407,16 +447,20 @@ int16_t Gui::GetIntegerScaleFactor() {
             // Screen bounds take priority over whatever Factor is set to.
 
             // The same comparison as below, but checked against the configured factor
-            if (((float)gfx_current_game_window_viewport.height / gfx_current_game_window_viewport.width) <
-                ((float)gfx_current_dimensions.height / gfx_current_dimensions.width)) {
-                if ((uint32_t)factor > gfx_current_game_window_viewport.height / gfx_current_dimensions.height) {
+            if (((float)mInterpreter.lock()->mGameWindowViewport.height /
+                 mInterpreter.lock()->mGameWindowViewport.width) <
+                ((float)mInterpreter.lock()->mCurDimensions.height / mInterpreter.lock()->mCurDimensions.width)) {
+                if ((uint32_t)factor >
+                    mInterpreter.lock()->mGameWindowViewport.height / mInterpreter.lock()->mCurDimensions.height) {
                     // Scale to window height
-                    factor = gfx_current_game_window_viewport.height / gfx_current_dimensions.height;
+                    factor =
+                        mInterpreter.lock()->mGameWindowViewport.height / mInterpreter.lock()->mCurDimensions.height;
                 }
             } else {
-                if ((uint32_t)factor > gfx_current_game_window_viewport.width / gfx_current_dimensions.width) {
+                if ((uint32_t)factor >
+                    mInterpreter.lock()->mGameWindowViewport.width / mInterpreter.lock()->mCurDimensions.width) {
                     // Scale to window width
-                    factor = gfx_current_game_window_viewport.width / gfx_current_dimensions.width;
+                    factor = mInterpreter.lock()->mGameWindowViewport.width / mInterpreter.lock()->mCurDimensions.width;
                 }
             }
         }
@@ -429,13 +473,13 @@ int16_t Gui::GetIntegerScaleFactor() {
         int16_t factor = 1;
 
         // Compare aspect ratios of game framebuffer and GUI
-        if (((float)gfx_current_game_window_viewport.height / gfx_current_game_window_viewport.width) <
-            ((float)gfx_current_dimensions.height / gfx_current_dimensions.width)) {
+        if (((float)mInterpreter.lock()->mGameWindowViewport.height / mInterpreter.lock()->mGameWindowViewport.width) <
+            ((float)mInterpreter.lock()->mCurDimensions.height / mInterpreter.lock()->mCurDimensions.width)) {
             // Scale to window height
-            factor = gfx_current_game_window_viewport.height / gfx_current_dimensions.height;
+            factor = mInterpreter.lock()->mGameWindowViewport.height / mInterpreter.lock()->mCurDimensions.height;
         } else {
             // Scale to window width
-            factor = gfx_current_game_window_viewport.width / gfx_current_dimensions.width;
+            factor = mInterpreter.lock()->mGameWindowViewport.width / mInterpreter.lock()->mCurDimensions.width;
         }
 
         // Add screen bounds offset, if set.
@@ -478,6 +522,7 @@ void Gui::DrawMenu() {
     if (!ImGui::DockBuilderGetNode(dockId)) {
         ImGui::DockBuilderRemoveNode(dockId);
         ImGui::DockBuilderAddNode(dockId, ImGuiDockNodeFlags_NoTabBar);
+        ImGui::DockBuilderSetNodeSize(dockId, ImVec2(viewport->Size.x, viewport->Size.y));
 
         ImGui::DockBuilderDockWindow("Main Game", dockId);
 
@@ -486,11 +531,12 @@ void Gui::DrawMenu() {
 
     ImGui::DockSpace(dockId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None | ImGuiDockNodeFlags_NoDockingInCentralNode);
 
-    if (ImGui::IsKeyPressed(TOGGLE_BTN) || ImGui::IsKeyPressed(ImGuiKey_Escape) ||
-        (ImGui::IsKeyPressed(TOGGLE_PAD_BTN) && CVarGetInteger(CVAR_IMGUI_CONTROLLER_NAV, 0))) {
-        if ((ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsKeyPressed(TOGGLE_PAD_BTN)) && GetMenu()) {
+    if (ImGui::IsKeyPressed(TOGGLE_BTN, false) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) ||
+        (ImGui::IsKeyPressed(TOGGLE_PAD_BTN, false) && CVarGetInteger(CVAR_IMGUI_CONTROLLER_NAV, 0))) {
+        if ((ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(TOGGLE_PAD_BTN, false)) && GetMenu()) {
             GetMenu()->ToggleVisibility();
-        } else if ((ImGui::IsKeyPressed(TOGGLE_BTN) || ImGui::IsKeyPressed(TOGGLE_PAD_BTN)) && GetMenuBar()) {
+        } else if ((ImGui::IsKeyPressed(TOGGLE_BTN, false) || ImGui::IsKeyPressed(TOGGLE_PAD_BTN, false)) &&
+                   GetMenuBar()) {
             GetMenuBar()->ToggleVisibility();
         }
         if (wnd->IsFullscreen()) {
@@ -504,21 +550,13 @@ void Gui::DrawMenu() {
         }
     }
 
-#if SDL_PLATFORM_APPLE
-    if ((ImGui::IsKeyDown(ImGuiKey_LeftSuper) || ImGui::IsKeyDown(ImGuiKey_RightSuper)) &&
-        ImGui::IsKeyPressed(ImGuiKey_R, false)) {
-        std::reinterpret_pointer_cast<ConsoleWindow>(
-            Context::GetInstance()->GetWindow()->GetGui()->GetGuiWindow("Console"))
-            ->Dispatch("reset");
-    }
-#else
+    // Mac interprets this as cmd+r when io.ConfigMacOSXBehavior is on (on by default)
     if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) &&
         ImGui::IsKeyPressed(ImGuiKey_R, false)) {
         std::reinterpret_pointer_cast<ConsoleWindow>(
             Context::GetInstance()->GetWindow()->GetGui()->GetGuiWindow("Console"))
             ->Dispatch("reset");
     }
-#endif
 
     if (GetMenuBar()) {
         GetMenuBar()->Update();
@@ -582,12 +620,12 @@ void Gui::CalculateGameViewport() {
     mainPos.x -= mTemporaryWindowPos.x;
     mainPos.y -= mTemporaryWindowPos.y;
     ImVec2 size = ImGui::GetContentRegionAvail();
-    gfx_current_dimensions.width = (uint32_t)(size.x * gfx_current_dimensions.internal_mul);
-    gfx_current_dimensions.height = (uint32_t)(size.y * gfx_current_dimensions.internal_mul);
-    gfx_current_game_window_viewport.x = (int16_t)mainPos.x;
-    gfx_current_game_window_viewport.y = (int16_t)mainPos.y;
-    gfx_current_game_window_viewport.width = (int16_t)size.x;
-    gfx_current_game_window_viewport.height = (int16_t)size.y;
+    mInterpreter.lock()->mCurDimensions.width = (uint32_t)(size.x * mInterpreter.lock()->mCurDimensions.internal_mul);
+    mInterpreter.lock()->mCurDimensions.height = (uint32_t)(size.y * mInterpreter.lock()->mCurDimensions.internal_mul);
+    mInterpreter.lock()->mGameWindowViewport.x = (int16_t)mainPos.x;
+    mInterpreter.lock()->mGameWindowViewport.y = (int16_t)mainPos.y;
+    mInterpreter.lock()->mGameWindowViewport.width = (int16_t)size.x;
+    mInterpreter.lock()->mGameWindowViewport.height = (int16_t)size.y;
 
     if (CVarGetInteger(CVAR_PREFIX_ADVANCED_RESOLUTION ".Enabled", 0)) {
         ApplyResolutionChanges();
@@ -595,24 +633,24 @@ void Gui::CalculateGameViewport() {
 
     switch (CVarGetInteger(CVAR_LOW_RES_MODE, 0)) {
         case 1: { // N64 Mode
-            gfx_current_dimensions.width = 320;
-            gfx_current_dimensions.height = 240;
+            mInterpreter.lock()->mCurDimensions.width = 320;
+            mInterpreter.lock()->mCurDimensions.height = 240;
             /*
             const int sw = size.y * 320 / 240;
-            gfx_current_game_window_viewport.x += ((int)size.x - sw) / 2;
-            gfx_current_game_window_viewport.width = sw;*/
+            mInterpreter.lock()->mGameWindowViewport.x += ((int)size.x - sw) / 2;
+            mInterpreter.lock()->mGameWindowViewport.width = sw;*/
             break;
         }
         case 2: { // 240p Widescreen
             const int vertRes = 240;
-            gfx_current_dimensions.width = vertRes * size.x / size.y;
-            gfx_current_dimensions.height = vertRes;
+            mInterpreter.lock()->mCurDimensions.width = vertRes * size.x / size.y;
+            mInterpreter.lock()->mCurDimensions.height = vertRes;
             break;
         }
         case 3: { // 480p Widescreen
             const int vertRes = 480;
-            gfx_current_dimensions.width = vertRes * size.x / size.y;
-            gfx_current_dimensions.height = vertRes;
+            mInterpreter.lock()->mCurDimensions.width = vertRes * size.x / size.y;
+            mInterpreter.lock()->mCurDimensions.height = vertRes;
             break;
         }
     }
@@ -644,8 +682,10 @@ void Gui::DrawGame() {
     } else if (CVarGetInteger(CVAR_PREFIX_ADVANCED_RESOLUTION ".Enabled", 0)) {
         if (!CVarGetInteger(CVAR_PREFIX_ADVANCED_RESOLUTION ".PixelPerfectMode", 0)) {
             if (!CVarGetInteger(CVAR_PREFIX_ADVANCED_RESOLUTION ".IgnoreAspectCorrection", 0)) {
-                float sWdth = size.y * gfx_current_dimensions.width / gfx_current_dimensions.height;
-                float sHght = size.x * gfx_current_dimensions.height / gfx_current_dimensions.width;
+                float sWdth =
+                    size.y * mInterpreter.lock()->mCurDimensions.width / mInterpreter.lock()->mCurDimensions.height;
+                float sHght =
+                    size.x * mInterpreter.lock()->mCurDimensions.height / mInterpreter.lock()->mCurDimensions.width;
                 float sPosX = floor(size.x / 2.0f - sWdth / 2.0f);
                 float sPosY = floor(size.y / 2.0f - sHght / 2.0f);
                 if (sPosY < 0.0f) { // pillarbox
@@ -661,15 +701,17 @@ void Gui::DrawGame() {
             }
         } else { // in pixel perfect mode it's much easier
             const int factor = GetIntegerScaleFactor();
-            float sPosX = floor(size.x / 2.0f - (gfx_current_dimensions.width * factor) / 2.0f);
-            float sPosY = floor(size.y / 2.0f - (gfx_current_dimensions.height * factor) / 2.0f);
+            float sPosX = floor(size.x / 2.0f - (mInterpreter.lock()->mCurDimensions.width * factor) / 2.0f);
+            float sPosY = floor(size.y / 2.0f - (mInterpreter.lock()->mCurDimensions.height * factor) / 2.0f);
             pos = ImVec2(sPosX, sPosY);
-            size = ImVec2(float(gfx_current_dimensions.width) * factor, float(gfx_current_dimensions.height) * factor);
+            size = ImVec2(float(mInterpreter.lock()->mCurDimensions.width) * factor,
+                          float(mInterpreter.lock()->mCurDimensions.height) * factor);
         }
     }
-    if (gfxFramebuffer) {
+    uintptr_t fb = Ship::Context::GetInstance()->GetWindow()->GetGfxFrameBuffer();
+    if (fb) {
         ImGui::SetCursorPos(pos);
-        ImGui::Image(reinterpret_cast<ImTextureID>(gfxFramebuffer), size);
+        ImGui::Image(reinterpret_cast<ImTextureID>(fb), size);
     }
 
     ImGui::End();
@@ -678,22 +720,24 @@ void Gui::DrawGame() {
 void Gui::DrawFloatingWindows() {
     if (mImGuiIo->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         WindowBackend backend = Context::GetInstance()->GetWindow()->GetWindowBackend();
-        // OpenGL requires extra platform handling on the GL context
+        // OpenGL requires extra platform handling on the GL mContext
         if (backend == WindowBackend::FAST3D_SDL_OPENGL && mImpl.Opengl.Context != nullptr) {
-            // Backup window and context before calling RenderPlatformWindowsDefault
+            // Backup window and mContext before calling RenderPlatformWindowsDefault
             SDL_Window* backupCurrentWindow = SDL_GL_GetCurrentWindow();
             SDL_GLContext backupCurrentContext = SDL_GL_GetCurrentContext();
 
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault();
 
-            // Set back the GL context for next frame
+            // Set back the GL mContext for next frame
             SDL_GL_MakeCurrent(backupCurrentWindow, backupCurrentContext);
         } else {
 #ifdef SDL_PLATFORM_APPLE
             // Metal requires additional frame setup to get ImGui ready for drawing floating windows
             if (backend == WindowBackend::FAST3D_SDL_METAL) {
-                Metal_SetupFloatingFrame();
+                Fast::GfxRenderingAPIMetal* api =
+                    (Fast::GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
+                api->SetupFloatingFrame();
             }
 #endif
 
@@ -731,18 +775,8 @@ void Gui::EndDraw() {
 }
 
 ImTextureID Gui::GetTextureById(int32_t id) {
-#ifdef ENABLE_DX11
-    if (Context::GetInstance()->GetWindow()->GetWindowBackend() == WindowBackend::FAST3D_DXGI_DX11) {
-        return gfx_d3d11_get_texture_by_id(id);
-    }
-#endif
-#ifdef SDL_PLATFORM_APPLE
-    if (Context::GetInstance()->GetWindow()->GetWindowBackend() == WindowBackend::FAST3D_SDL_METAL) {
-        return gfx_metal_get_texture_by_id(id);
-    }
-#endif
-
-    return reinterpret_cast<ImTextureID>(id);
+    Fast::GfxRenderingAPI* api = mInterpreter.lock()->GetCurrentRenderingAPI();
+    return api->GetTextureById(id);
 }
 
 bool Gui::HasTextureByName(const std::string& name) {
@@ -773,9 +807,12 @@ void Gui::ImGuiRenderDrawData(ImDrawData* data) {
 #endif
 
 #ifdef SDL_PLATFORM_APPLE
-        case WindowBackend::FAST3D_SDL_METAL:
-            Metal_RenderDrawData(data);
+        case WindowBackend::FAST3D_SDL_METAL: {
+            Fast::GfxRenderingAPIMetal* api =
+                (Fast::GfxRenderingAPIMetal*)mInterpreter.lock()->GetCurrentRenderingAPI();
+            api->RenderDrawData(data);
             break;
+        }
 #endif
 
 #ifdef ENABLE_DX11
@@ -823,7 +860,7 @@ std::shared_ptr<GuiWindow> Gui::GetGuiWindow(const std::string& name) {
 }
 
 void Gui::LoadGuiTexture(const std::string& name, const Fast::Texture& res, const ImVec4& tint) {
-    GfxRenderingAPI* api = gfx_get_current_rendering_api();
+    Fast::GfxRenderingAPI* api = mInterpreter.lock()->GetCurrentRenderingAPI();
     std::vector<uint8_t> texBuffer;
     texBuffer.reserve(res.Width * res.Height * 4);
 
@@ -946,13 +983,13 @@ void Gui::LoadGuiTexture(const std::string& name, const Fast::Texture& res, cons
     }
 
     GuiTextureMetadata asset;
-    asset.RendererTextureId = api->new_texture();
+    asset.RendererTextureId = api->NewTexture();
     asset.Width = res.Width;
     asset.Height = res.Height;
 
-    api->select_texture(0, asset.RendererTextureId);
-    api->set_sampler_parameters(0, false, 0, 0);
-    api->upload_texture(texBuffer.data(), res.Width, res.Height);
+    api->SelectTexture(0, asset.RendererTextureId);
+    api->SetSamplerParameters(0, false, 0, 0);
+    api->UploadTexture(texBuffer.data(), res.Width, res.Height);
 
     mGuiTextures[name] = asset;
 }
@@ -967,8 +1004,8 @@ void Gui::LoadGuiTexture(const std::string& name, const std::string& path, const
 void Gui::UnloadTexture(const std::string& name) {
     if (mGuiTextures.contains(name)) {
         GuiTextureMetadata tex = mGuiTextures[name];
-        GfxRenderingAPI* api = gfx_get_current_rendering_api();
-        api->delete_texture(tex.RendererTextureId);
+        Fast::GfxRenderingAPI* api = mInterpreter.lock()->GetCurrentRenderingAPI();
+        api->DeleteTexture(tex.RendererTextureId);
         mGuiTextures.erase(name);
     }
 }
