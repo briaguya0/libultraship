@@ -410,7 +410,7 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     // SDL_VERSION(&wmInfo.version);
     // SDL_GetWindowWMInfo(mWnd, &wmInfo);
     // HWND hwnd = wmInfo.info.win.window;
-    HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(wnd), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(mWnd), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
     SDL_WndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)gfx_sdl_wnd_proc);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 #endif
