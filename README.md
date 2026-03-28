@@ -35,22 +35,43 @@ Thank you to JetBrains for providing their IDE [CLion](https://www.jetbrains.com
 ## License
 LUS is licensed under the [MIT](https://github.com/Kenix3/libultraship/blob/main/LICENSE) license.
 
-LUS makes use of the following third party libraries and resources:
-- [Fast3D](https://github.com/Kenix3/libultraship/blob/main/src/fast/LICENSE.txt) (MIT) render display lists.
-- [prism-processor](https://github.com/KiritoDv/prism-processor/blob/main/LICENSE) (MIT) shader preprocessor
-- [ImGui](https://github.com/ocornut/imgui/blob/master/LICENSE.txt) (MIT)  display UI.
-- [StormLib](https://github.com/ladislav-zezula/StormLib/blob/master/LICENSE) (MIT) create and read `.mpq` compatible archive files.
-- [libzip](https://github.com/nih-at/libzip/blob/main/LICENSE) (BSD-3-Clause) create and read `.zip` compatible archives
-- [StrHash64](https://github.com/Kenix3/libultraship/blob/main/src/ship/utils/StrHash64.cpp) (MIT, zlib, BSD-3-Clause) provide crc64 implementation.
-- [nlohmann-json](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT) (MIT) json parsing and saving.
-- [spdlog](https://github.com/gabime/spdlog/blob/v1.x/LICENSE) (MIT) logging
-- [stb](https://github.com/nothings/stb/blob/master/LICENSE) (MIT) image conversion
-- [thread-pool](https://github.com/bshoshany/thread-pool/blob/master/LICENSE.txt) (MIT) thread pool for the resource manager
-- [tinyxml2](https://github.com/leethomason/tinyxml2/blob/master/LICENSE.txt) (zlib) parse XML files for resource loaders
-- [zlib](https://github.com/madler/zlib/blob/develop/LICENSE) (zlib) compression used in StormLib
-- [bzip2](https://github.com/libarchive/bzip2?tab=License-1-ov-file#readme) (bzip2) compression used in StormLib
-- [sdl2](https://github.com/libsdl-org/SDL/blob/main/LICENSE.txt) (zlib) window manager, controllers, and audio player
-- [glob_match](https://github.com/torvalds/linux/blob/d1bd5fa07667fcc3e38996ec42aef98761f23039/lib/glob.c) (Dual MIT/GPL) Glob pattern matching.
-- [libgfxd](https://github.com/glankk/libgfxd/blob/master/LICENSE) (MIT) display list disassembler.
-- [metal-cpp](https://github.com/bkaradzic/metal-cpp/blob/metal-cpp_26/LICENSE.txt) (Apache 2.0) interface to the Apple Metal rendering backend.
-- [glew](https://github.com/nigels-com/glew/blob/master/LICENSE.txt) (modified BSD-3-Clause and MIT) OpenGL extension loading library.
+## Third Party Libraries and Resources
+
+### Core
+
+| Library | Description | License |
+|---------|-------------|---------|
+| **Fast3D** | Render display lists | [MIT](https://github.com/Kenix3/libultraship/blob/main/src/fast/LICENSE.txt) |
+| **prism-processor** | Shader preprocessor | [MIT](https://github.com/KiritoDv/prism-processor/blob/main/LICENSE) |
+| **ImGui** | UI | [MIT](https://github.com/ocornut/imgui/blob/master/LICENSE.txt) |
+| **StrHash64** | CRC64 implementation | [MIT, zlib, BSD-3-Clause](https://github.com/Kenix3/libultraship/blob/main/src/ship/utils/StrHash64.cpp) |
+| **nlohmann-json** | JSON parsing and saving | [MIT](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT) |
+| **spdlog** | Logging | [MIT](https://github.com/gabime/spdlog/blob/v1.x/LICENSE) |
+| **stb** | Image conversion | [MIT](https://github.com/nothings/stb/blob/master/LICENSE) |
+| **thread-pool** | Thread pool for the resource manager | [MIT](https://github.com/bshoshany/thread-pool/blob/master/LICENSE.txt) |
+| **tinyxml2** | XML parsing for resource loaders | [zlib](https://github.com/leethomason/tinyxml2/blob/master/LICENSE.txt) |
+| **zlib** | Compression | [zlib](https://github.com/madler/zlib/blob/develop/LICENSE) |
+| **bzip2** | Compression | [bzip2](https://github.com/libarchive/bzip2?tab=License-1-ov-file#readme) |
+| **sdl2** | Window management, controllers, and audio | [zlib](https://github.com/libsdl-org/SDL/blob/main/LICENSE.txt) |
+| **glob_match** | Glob pattern matching | [Dual MIT/GPL](https://github.com/torvalds/linux/blob/d1bd5fa07667fcc3e38996ec42aef98761f23039/lib/glob.c) |
+| **libzip** | Create and read `.zip` compatible archives | [BSD-3-Clause](https://github.com/nih-at/libzip/blob/main/LICENSE) |
+
+### Optional
+
+| Library | Description | License | Flag |
+|---------|-------------|---------|------|
+| **StormLib** | Create and read `.mpq` compatible archive files | [MIT](https://github.com/ladislav-zezula/StormLib/blob/master/LICENSE) | `-DINCLUDE_MPQ_SUPPORT=ON` |
+| **libgfxd** | Display list disassembler | [MIT](https://github.com/glankk/libgfxd/blob/master/LICENSE) | `-DGFX_DEBUG_DISASSEMBLER=ON` |
+
+### Platform Specific
+
+| Library | Description | License | Platform(s) |
+|---------|-------------|---------|-------------|
+| **metal-cpp** | Apple Metal rendering backend | [Apache 2.0](https://github.com/bkaradzic/metal-cpp/blob/metal-cpp_26/LICENSE.txt) | macOS, iOS |
+| **glew** | OpenGL extension loading | [modified BSD-3-Clause and MIT](https://github.com/nigels-com/glew/blob/master/LICENSE.txt) | macOS, Windows |
+
+### Testing (`-DLUS_BUILD_TESTS=ON`)
+
+| Library | Description | License |
+|---------|-------------|---------|
+| **GoogleTest** | Unit testing framework | [BSD-3-Clause](https://github.com/google/googletest/blob/main/LICENSE) |
