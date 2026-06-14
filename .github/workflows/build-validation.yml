@@ -110,6 +110,58 @@ jobs:
         name: soh-linux
         path: build-cmake/src/*.a
         if-no-files-found: error
+  build-linux-clang:
+    runs-on: ubuntu-26.04
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y $(cat .github/workflows/apt-deps.txt)
+        sudo apt-get install clang
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2.14
+      with:
+        key: ${{ matrix.os }}-ccache-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ${{ matrix.os }}-ccache-${{ github.ref }}
+          ${{ matrix.os }}-ccache-
+    - name: Install latest SDL
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        wget https://www.libsdl.org/release/SDL2-2.24.1.tar.gz
+        tar -xzf SDL2-2.24.1.tar.gz
+        cd SDL2-2.24.1
+        ./configure
+        make -j 10
+        sudo make install
+    - name: Install latest tinyxml2
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        wget https://github.com/leethomason/tinyxml2/archive/refs/tags/10.0.0.tar.gz
+        tar -xzf 10.0.0.tar.gz
+        cd tinyxml2-10.0.0
+        mkdir build
+        cd build
+        cmake ..
+        make
+        sudo make install
+    - name: Install Python dependencies
+      run: python3 -m pip install -r requirements.txt
+    - name: Build libultraship
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release
+        cmake --build build-cmake --config Release --parallel 10
+      env:
+        CC: clang
+        CXX: clang++
+    - name: Upload build
+      uses: actions/upload-artifact@v4
+      with:
+        name: soh-linux
+        path: build-cmake/src/*.a
+        if-no-files-found: error
   build-android:
     runs-on: ubuntu-latest
     env:
