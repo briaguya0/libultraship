@@ -1,4 +1,4 @@
-# libultraship
+# libultraship (README CHANGE TO SEE VCPKG ERROR)
 
 libultraship (LUS) is a library meant to provide reimplementations of libultra (n64 sdk) functions that run on modern hardware.
 
