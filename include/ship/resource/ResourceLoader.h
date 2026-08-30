@@ -62,6 +62,10 @@ class ResourceLoader {
      * @param fileToLoad Raw file buffer as returned by the archive layer.
      * @param initData   Optional metadata overrides; pass nullptr to infer from the header.
      * @return Deserialized IResource, or nullptr if no matching factory was found or parsing failed.
+     *
+     * @note Reading an "alt/" asset that turns out to be malformed reports nullptr instead of
+     * propagating the failure, so that the caller can fall back to the vanilla asset. Assets
+     * outside "alt/" are deliberately left to fail hard.
      */
     std::shared_ptr<IResource> LoadResource(std::string filePath, std::shared_ptr<File> fileToLoad,
                                             std::shared_ptr<ResourceInitData> initData = nullptr);
@@ -87,6 +91,16 @@ class ResourceLoader {
     uint32_t GetResourceType(const std::string& type);
 
   protected:
+    /**
+     * @brief Body of LoadResource, without the "alt/" failure containment.
+     *
+     * Kept separate so that a non-"alt/" load never runs inside a try block: an exception raised
+     * while reading a base game asset then reaches the crash handler with its original stack
+     * intact, rather than one rooted at a rethrow.
+     */
+    std::shared_ptr<IResource> ReadResourceIntoMemory(const std::string& filePath, std::shared_ptr<File> fileToLoad,
+                                                      std::shared_ptr<ResourceInitData> initData);
+
     /** @brief Registers the built-in factories (Blob, JSON, Shader). Called during construction. */
     void RegisterGlobalResourceFactories();
 

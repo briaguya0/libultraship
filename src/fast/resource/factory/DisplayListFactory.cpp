@@ -4,6 +4,7 @@
 #include "libultraship/libultra/gbi.h"
 #include "fast/lus_gbi.h"
 #include <tinyxml2.h>
+#include <stdexcept>
 
 namespace Fast {
 std::unordered_map<std::string, uint32_t> renderModes = {
@@ -175,7 +176,19 @@ ResourceFactoryBinaryDisplayListV0::ReadResource(std::shared_ptr<Ship::File> fil
 
     auto displayList = std::make_shared<DisplayList>(initData);
     auto reader = std::get<std::shared_ptr<Ship::BinaryReader>>(file->Reader);
-    auto ucode = (UcodeHandlers)reader->ReadInt8();
+
+    // A display list opens by declaring the ucode its opcodes belong to. An out of range value
+    // leaves the read below with no terminator to look for (GetEndOpcodeByUCode would answer -1,
+    // which as an opcode is G_SETCIMG), so it would stop at an arbitrary command and hand back a
+    // list that the interpreter walks straight off the end of.
+    const int8_t rawUCode = reader->ReadInt8();
+    if (rawUCode < 0 || rawUCode >= ucode_max) {
+        throw std::runtime_error("display list " + initData->Path + " declares unknown ucode " +
+                                 std::to_string(rawUCode));
+    }
+
+    const auto ucode = (UcodeHandlers)rawUCode;
+    const int8_t endOpcode = GetEndOpcodeByUCode(ucode);
 
     displayList->UCode = ucode;
 
@@ -183,8 +196,18 @@ ResourceFactoryBinaryDisplayListV0::ReadResource(std::shared_ptr<Ship::File> fil
         reader->ReadInt8();
     }
 
+    // Commands are read until the terminator turns up, so the loop is bounded by the file to stop
+    // a truncated list from reading past the end of the buffer.
+    const size_t bufferSize = file->Buffer != nullptr ? file->Buffer->size() : 0;
+    const auto remaining = [&]() -> size_t {
+        const size_t position = reader->GetBaseAddress();
+        return position < bufferSize ? bufferSize - position : 0;
+    };
+    constexpr size_t commandSize = sizeof(uint32_t) * 2;
+
     size_t idx = 0;
-    while (true) {
+    bool terminated = false;
+    while (remaining() >= commandSize) {
         Gfx command;
         command.words.w0 = reader->ReadUInt32();
         command.words.w1 = reader->ReadUInt32();
@@ -196,6 +219,10 @@ ResourceFactoryBinaryDisplayListV0::ReadResource(std::shared_ptr<Ship::File> fil
 
         // These are 128-bit commands, so read an extra 64 bits...
         if (isExpanded) {
+            // ...which the file has to actually still hold.
+            if (remaining() < commandSize) {
+                break;
+            }
 #ifdef USE_GBI_TRACE
             command.words.trace.file = initData->Path.c_str();
             command.words.trace.idx = idx++;
@@ -214,9 +241,16 @@ ResourceFactoryBinaryDisplayListV0::ReadResource(std::shared_ptr<Ship::File> fil
 
         displayList->Instructions.push_back(command);
 
-        if (opcode == GetEndOpcodeByUCode(ucode)) {
+        if (opcode == endOpcode) {
+            terminated = true;
             break;
         }
+    }
+
+    // A list that never reached its end command has no defined extent, and executing it would run
+    // the interpreter into whatever memory happens to follow it.
+    if (!terminated) {
+        throw std::runtime_error("display list " + initData->Path + " is truncated or missing its end command");
     }
 
     return displayList;

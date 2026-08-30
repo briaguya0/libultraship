@@ -235,6 +235,31 @@ std::shared_ptr<ResourceInitData> ResourceLoader::ResolveMetaAlias(const std::st
 
 std::shared_ptr<IResource> ResourceLoader::LoadResource(std::string filePath, std::shared_ptr<File> fileToLoad,
                                                         std::shared_ptr<ResourceInitData> initData) {
+    // An "alt/" asset comes from a user supplied mod, and a broken one must not take the game
+    // down with it. Report the failure as a null resource so that the caller can recover, which
+    // for ResourceManager::LoadResourceProcess means retrying the vanilla asset at the non-"alt/"
+    // path. A malformed asset outside "alt/" means the game's own archive is bad, so it is left
+    // to fail hard rather than being papered over.
+    if (!filePath.starts_with(IResource::gAltAssetPrefix)) {
+        return ReadResourceIntoMemory(filePath, fileToLoad, initData);
+    }
+
+    try {
+        return ReadResourceIntoMemory(filePath, fileToLoad, initData);
+    } catch (const std::exception& e) {
+        SPDLOG_ERROR("Failed to read the mod asset at path {} ({}). Falling back to the vanilla asset.", filePath,
+                     e.what());
+        return nullptr;
+    } catch (...) {
+        SPDLOG_ERROR("Failed to read the mod asset at path {} (unknown error). Falling back to the vanilla asset.",
+                     filePath);
+        return nullptr;
+    }
+}
+
+std::shared_ptr<IResource> ResourceLoader::ReadResourceIntoMemory(const std::string& filePath,
+                                                                  std::shared_ptr<File> fileToLoad,
+                                                                  std::shared_ptr<ResourceInitData> initData) {
     // fileToLoad is the highest-priority real asset at filePath, or null when the resource
     // exists only as a `.meta` alias. Prefer a winning alias, else read the real asset's header.
     bool legacyInitData = false;
